@@ -255,6 +255,14 @@ async function loadAll(){
     STATE.config.people[1].name = 'MB';
     await sset('config', STATE.config);
   }
+  if(STATE.config.people[0].weightKg === 70 && !STATE.config.people[0].fibreTarget){
+    STATE.config.people[0].weightKg = 65;
+    STATE.config.people[0].fibreTarget = 25;
+    STATE.config.people[1].weightKg = 71;
+    STATE.config.people[1].fibreTarget = 30;
+    await sset('config', STATE.config);
+    toast('Weight/fibre targets updated to 65/25 and 71/30');
+  }
   STATE.foods = await sget('foods-list') || {};
   const existingHoney = Object.values(STATE.foods).find(f=>f.name==='Honey' && f.unit==='g');
   if(existingHoney){
@@ -434,15 +442,14 @@ function checkSplitSums(){
   const mealOk = Math.abs(mealSum-100)<0.5;
   document.getElementById('macro-sum-warn').innerHTML = macroOk
     ? `<span style="color:var(--good);">Sums to ${round0(macroSum)}%</span>`
-    : `<span style="color:var(--bad);">Sums to ${round0(macroSum)}% — must total 100%</span>`;
+    : `<span style="color:var(--bad);">Sums to ${round0(macroSum)}% — won't be saved until this totals 100%</span>`;
   document.getElementById('meal-sum-warn').innerHTML = mealOk
     ? `<span style="color:var(--good);">Sums to ${round0(mealSum)}%</span>`
-    : `<span style="color:var(--bad);">Sums to ${round0(mealSum)}% — must total 100%</span>`;
-  document.getElementById('save-config-btn').disabled = !(macroOk && mealOk);
+    : `<span style="color:var(--bad);">Sums to ${round0(mealSum)}% — won't be saved until this totals 100%</span>`;
   return macroOk && mealOk;
 }
 async function saveConfig(){
-  if(!checkSplitSums()){ toast('Fix split percentages first — each group must total 100%'); return; }
+  const splitsOk = checkSplitSums();
   const cfg = STATE.config;
   cfg.people.forEach((p,i)=>{
     p.weightKg = parseFloat(document.getElementById(`p${i}-weight`).value)||p.weightKg;
@@ -451,18 +458,20 @@ async function saveConfig(){
     p.rangePoint = parseFloat(document.getElementById(`p${i}-point`).value)||0;
     p.fibreTarget = parseFloat(document.getElementById(`p${i}-fibre`).value)||0;
   });
-  cfg.macroSplit = {
-    protein: parseFloat(document.getElementById('ms-protein').value)||0,
-    carb: parseFloat(document.getElementById('ms-carb').value)||0,
-    fat: parseFloat(document.getElementById('ms-fat').value)||0,
-  };
-  cfg.mealSplit = {
-    breakfast: parseFloat(document.getElementById('sp-breakfast').value)||0,
-    lunch: parseFloat(document.getElementById('sp-lunch').value)||0,
-    dinner: parseFloat(document.getElementById('sp-dinner').value)||0,
-  };
+  if(splitsOk){
+    cfg.macroSplit = {
+      protein: parseFloat(document.getElementById('ms-protein').value)||0,
+      carb: parseFloat(document.getElementById('ms-carb').value)||0,
+      fat: parseFloat(document.getElementById('ms-fat').value)||0,
+    };
+    cfg.mealSplit = {
+      breakfast: parseFloat(document.getElementById('sp-breakfast').value)||0,
+      lunch: parseFloat(document.getElementById('sp-lunch').value)||0,
+      dinner: parseFloat(document.getElementById('sp-dinner').value)||0,
+    };
+  }
   await sset('config', cfg);
-  toast('Config saved');
+  toast(splitsOk ? 'Config saved' : 'Saved weight/goal/fibre — fix the % splits to save those too');
   render();
 }
 

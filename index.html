@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Shredder</title>
 <style>
   :root{
@@ -37,6 +38,7 @@
     font-size:14px;font-family:inherit;color:var(--ink);
   }
   input[type=number]{font-family:"Menlo",monospace;}
+  input[type=date]{width:160px;}
   .row{display:flex;gap:10px;margin-bottom:10px;align-items:flex-end;flex-wrap:wrap;}
   .row > div{flex:1;min-width:110px;}
   button.btn{
@@ -169,8 +171,8 @@ const RANGE_TABLE = {
 
 const DEFAULT_CONFIG = {
   people: [
-    {id:'p1', name:'NJ', weightKg:70, activity:'moderate', goal:'lose', rangePoint:0},
-    {id:'p2', name:'MB', weightKg:70, activity:'moderate', goal:'lose', rangePoint:0}
+    {id:'p1', name:'NJ', weightKg:65, activity:'moderate', goal:'lose', rangePoint:0, fibreTarget:25},
+    {id:'p2', name:'MB', weightKg:71, activity:'moderate', goal:'lose', rangePoint:0, fibreTarget:30}
   ],
   macroSplit: {protein:30, carb:45, fat:25}, // %
   mealSplit: {breakfast:20, lunch:35, dinner:45} // %
@@ -876,7 +878,7 @@ function renderToday(root){
   const entries = STATE.logs[date]||[];
   root.innerHTML = `
     <div class="panel">
-      <div class="row"><div><label>Date</label><input type="date" id="td-date" value="${date}" onchange="STATE.currentDate=this.value; renderToday(document.getElementById('tabroot'))"></div></div>
+      <div class="row"><div style="max-width:220px;"><label>Date</label><input type="date" id="td-date" value="${date}" onchange="STATE.currentDate=this.value; renderToday(document.getElementById('tabroot'))"></div></div>
     </div>
     <div class="grid2">
       ${cfg.people.map(p=>renderPersonToday(p,cfg,entries)).join('')}

@@ -80,6 +80,43 @@
   .tag-x{cursor:pointer;}
   select.unit{max-width:70px;}
   .num-tight{width:70px;flex:none;}
+  .ing-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+  .ing-row .ing-food{flex:2 1 200px;min-width:0;}
+  .ing-row .ing-amount{flex:0 0 90px;}
+  .ing-row .ing-amount input{width:100%;}
+  .ing-row .ing-assign{flex:1 1 140px;min-width:0;}
+  .ing-row .ing-del{flex:none;}
+
+  @media(max-width:640px){
+    .app{padding:10px 10px 60px;}
+    header h1{font-size:19px;}
+    header .tag{font-size:10px;}
+    nav{gap:2px;}
+    nav button{padding:10px 10px;font-size:12px;}
+    .panel{padding:12px;border-radius:8px;}
+    label{font-size:12px;}
+    input,select{padding:10px 9px;font-size:16px;}
+    .row{gap:8px;}
+    .row > div{min-width:0;flex:1 1 46%;}
+    .num-tight{width:auto;flex:1 1 70px;}
+    button.btn{padding:11px 14px;font-size:13px;}
+    table{font-size:12px;}
+    th,td{padding:7px 5px;}
+    .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .table-scroll table{min-width:560px;}
+    .grid2{gap:10px;}
+    .person-card{padding:10px;}
+    .person-card h3{font-size:16px;}
+    .food-line input{max-width:64px;}
+    .stat{font-size:12px;}
+    .toast{font-size:12px;padding:8px 14px;max-width:90%;}
+    .ing-row{gap:6px;}
+    .ing-row .ing-food{flex:1 1 100%;}
+    .ing-row .ing-amount{flex:1 1 70px;}
+    .ing-row .ing-assign{flex:2 1 120px;}
+    .ing-row .ing-del button{padding:8px 12px;}
+    input[type=file]{padding:6px;font-size:13px;}
+  }
 </style>
 </head>
 <body>
@@ -381,13 +418,13 @@ function renderTargetsOutput(p,cfg){
   return `
     <div class="person-card">
       <h3>${p.name}</h3>
-      <table>
+      <div class="table-scroll"><table>
         <tr><th></th><th>Cal</th><th>Protein g</th><th>Carb g</th><th>Fat g</th><th>Fibre g</th></tr>
         <tr><td class="mono">Daily</td><td class="mono">${round0(mt.day.cal)}</td><td class="mono">${round0(mt.day.protein)}</td><td class="mono">${round0(mt.day.carb)}</td><td class="mono">${round0(mt.day.fat)}</td><td class="mono">${p.fibreTarget?round0(p.fibreTarget):'—'}</td></tr>
         <tr><td class="mono">Breakfast</td><td class="mono">${round0(mt.meals.breakfast.cal)}</td><td class="mono">${round0(mt.meals.breakfast.protein)}</td><td class="mono">${round0(mt.meals.breakfast.carb)}</td><td class="mono">${round0(mt.meals.breakfast.fat)}</td><td>—</td></tr>
         <tr><td class="mono">Lunch</td><td class="mono">${round0(mt.meals.lunch.cal)}</td><td class="mono">${round0(mt.meals.lunch.protein)}</td><td class="mono">${round0(mt.meals.lunch.carb)}</td><td class="mono">${round0(mt.meals.lunch.fat)}</td><td>—</td></tr>
         <tr><td class="mono">Dinner</td><td class="mono">${round0(mt.meals.dinner.cal)}</td><td class="mono">${round0(mt.meals.dinner.protein)}</td><td class="mono">${round0(mt.meals.dinner.carb)}</td><td class="mono">${round0(mt.meals.dinner.fat)}</td><td>—</td></tr>
-      </table>
+      </table></div>
     </div>
   `;
 }
@@ -475,7 +512,7 @@ function renderFoods(root){
         <input id="food-search" style="max-width:220px;" placeholder="Search..." value="${foodSearchTerm}" oninput="foodSearchTerm=this.value;safeRerender(renderFoods)">
       </div>
       <p class="small">P ratio = protein ÷ (protein+carb+fat). <span class="pill high">High &gt;60%</span> mostly protein — safe pick when your gap is protein but carb/fat is tight. <span class="pill med">Med 30–60%</span> — decent protein with carb/fat headroom to spare. <span class="pill low">Low &lt;30%</span> — carb/fat dominant. X-flagged items sort last.</p>
-      <table>
+      <div class="table-scroll"><table>
         <tr><th>Name</th><th>Per</th><th>Cal</th><th>Protein</th><th>Carb</th><th>Fat</th><th>Fibre</th><th>Sugar</th><th>Salt</th><th></th><th></th></tr>
         ${filtered.map(f=>`
           <tr class="${f.isX?'x-row':''}">
@@ -492,7 +529,7 @@ function renderFoods(root){
             <td><button class="btn danger" style="padding:3px 8px;" onclick="deleteFood('${f.id}')">×</button></td>
           </tr>
         `).join('') || '<tr><td colspan="11" class="empty">No foods yet — add one above.</td></tr>'}
-      </table>
+      </table></div>
     </div>
   `;
 }
@@ -527,9 +564,11 @@ async function deleteFood(id){
 // BUILD A MEAL TAB
 // ============================================================
 let buildLines = [{foodId:'', grams:0}];
+let buildCookedWeight = '';
 function renderBuild(root){
   const foods = Object.values(STATE.foods).filter(f=>!f.isMeal).sort((a,b)=>a.name.localeCompare(b.name));
   const totals = computeBuildTotals();
+  const cookedNum = parseFloat(buildCookedWeight)||0;
   root.innerHTML = `
     <div class="panel">
       <div class="section-title">Batch meal builder</div>
@@ -539,25 +578,38 @@ function renderBuild(root){
       </div>
       <div id="build-lines">
         ${buildLines.map((l,i)=>`
-          <div class="row" style="align-items:center;">
-            <div style="flex:2;">
+          <div class="ing-row">
+            <div class="ing-food">
               <select onchange="buildLines[${i}].foodId=this.value; renderBuild(document.getElementById('tabroot'))">
                 <option value="">— pick ingredient —</option>
                 ${foods.map(f=>`<option value="${f.id}" ${l.foodId===f.id?'selected':''}>${f.name} — ${unitLabel(f.unit)}</option>`).join('')}
               </select>
             </div>
-            <div class="num-tight"><input id="build-grams-${i}" type="text" inputmode="decimal" placeholder="amount" value="${l.grams||''}" oninput="buildLines[${i}].grams=parseFloat(this.value)||0; safeRerender(renderBuild)"></div>
-            <div style="flex:none;"><button class="btn danger" style="padding:6px 10px;" onclick="buildLines.splice(${i},1); renderBuild(document.getElementById('tabroot'))">×</button></div>
+            <div class="ing-amount"><input id="build-grams-${i}" type="text" inputmode="decimal" placeholder="amount" value="${l.grams||''}" oninput="buildLines[${i}].grams=parseFloat(this.value)||0; safeRerender(renderBuild)"></div>
+            <div class="ing-del"><button class="btn danger" style="padding:6px 10px;" onclick="buildLines.splice(${i},1); renderBuild(document.getElementById('tabroot'))">×</button></div>
           </div>
         `).join('')}
       </div>
       <button class="btn secondary" onclick="buildLines.push({foodId:'',grams:0}); renderBuild(document.getElementById('tabroot'))">+ Add ingredient line</button>
 
-      <div class="section-title">Batch totals</div>
-      <table>
-        <tr>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}<th>Total g</th></tr>
+      <div class="section-title">Batch totals (raw ingredients — nutrients don't change on cooking)</div>
+      <div class="table-scroll"><table>
+        <tr>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}<th>Raw g in</th></tr>
         <tr>${NUTS.map(n=>`<td class="mono">${round1(totals[n])}</td>`).join('')}<td class="mono">${round0(totals.grams)}</td></tr>
-      </table>
+      </table></div>
+
+      <div class="section-title">Finished (cooked) weight</div>
+      <p class="small">Weigh the pan/pot once cooked (water you added doesn't need to be tracked — it's already reflected here since you're entering the actual finished weight). Leave blank to save per raw grams instead.</p>
+      <div class="row">
+        <div><label>Cooked weight (g)</label><input type="text" inputmode="decimal" id="bm-cooked" placeholder="e.g. 750" value="${buildCookedWeight}" oninput="buildCookedWeight=this.value; safeRerender(renderBuild)"></div>
+      </div>
+      ${cookedNum>0 ? `
+        <p class="small">This will save as <b class="mono">per 100g of the finished ${round0(cookedNum)}g batch</b>:</p>
+        <div class="table-scroll"><table>
+          <tr>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}</tr>
+          <tr>${NUTS.map(n=>`<td class="mono">${round1(totals[n]/cookedNum*100)}</td>`).join('')}</tr>
+        </table></div>
+      ` : ''}
       <p class="small">Saved as per-100g values, same as any ingredient — so you can log leftovers by grams eaten.</p>
       <button class="btn" onclick="saveMeal()">Save meal to master list</button>
     </div>
@@ -580,17 +632,20 @@ async function saveMeal(){
   const date = document.getElementById('bm-date').value || todayStr();
   const totals = computeBuildTotals();
   if(totals.grams<=0){ toast('Add ingredients with grams first'); return; }
+  const cookedNum = parseFloat(buildCookedWeight)||0;
+  const finalWeight = cookedNum>0 ? cookedNum : totals.grams;
   const per100 = {};
-  NUTS.forEach(n=> per100[n] = totals[n]/totals.grams*100);
+  NUTS.forEach(n=> per100[n] = totals[n]/finalWeight*100);
   const meal = {
     id: uid(), name: `Meal: ${name} (${date})`, unit:'g', isMeal:true, isX:false,
-    batchDate: date, batchWeight: totals.grams,
+    batchDate: date, batchWeight: finalWeight, rawWeight: totals.grams,
     ...per100
   };
   STATE.foods[meal.id] = meal;
   await sset('foods-list', STATE.foods);
-  toast('Meal saved to master list');
+  toast(cookedNum>0 ? `Meal saved — per 100g of ${round0(cookedNum)}g cooked weight` : 'Meal saved to master list');
   buildLines = [{foodId:'', grams:0}];
+  buildCookedWeight = '';
   renderBuild(document.getElementById('tabroot'));
 }
 
@@ -637,32 +692,32 @@ function renderLog(root){
       <div class="section-title">Plan the plate</div>
       <div id="plate-lines">
         ${plateLines.map((l,i)=>`
-          <div class="row" style="align-items:center;">
-            <div style="flex:2;">
+          <div class="ing-row">
+            <div class="ing-food">
               <select onchange="plateLines[${i}].foodId=this.value; renderLog(document.getElementById('tabroot'))">
                 <option value="">— pick ingredient or meal —</option>
                 ${foods.map(f=>`<option value="${f.id}" ${l.foodId===f.id?'selected':''}>${f.isX?'⚑ ':''}${f.name} — ${unitLabel(f.unit)}</option>`).join('')}
               </select>
             </div>
-            <div class="num-tight"><input id="plate-grams-${i}" type="text" inputmode="decimal" placeholder="amount" value="${l.grams||''}" oninput="plateLines[${i}].grams=parseFloat(this.value)||0; safeRerender(renderLog)"></div>
-            <div style="flex:1;min-width:130px;">
+            <div class="ing-amount"><input id="plate-grams-${i}" type="text" inputmode="decimal" placeholder="amount" value="${l.grams||''}" oninput="plateLines[${i}].grams=parseFloat(this.value)||0; safeRerender(renderLog)"></div>
+            <div class="ing-assign">
               <select onchange="plateLines[${i}].assign=this.value; renderLog(document.getElementById('tabroot'))">
                 <option value="shared" ${l.assign==='shared'?'selected':''}>Both (split)</option>
                 <option value="${p1.id}" ${l.assign===p1.id?'selected':''}>${p1.name} only</option>
                 <option value="${p2.id}" ${l.assign===p2.id?'selected':''}>${p2.name} only</option>
               </select>
             </div>
-            <div style="flex:none;"><button class="btn danger" style="padding:6px 10px;" onclick="plateLines.splice(${i},1); renderLog(document.getElementById('tabroot'))">×</button></div>
+            <div class="ing-del"><button class="btn danger" style="padding:6px 10px;" onclick="plateLines.splice(${i},1); renderLog(document.getElementById('tabroot'))">×</button></div>
           </div>
         `).join('')}
       </div>
       <button class="btn secondary" onclick="plateLines.push({foodId:'',grams:0,assign:'shared'}); renderLog(document.getElementById('tabroot'))">+ Add ingredient</button>
 
       <div class="section-title">This plate — totals</div>
-      <table>
+      <div class="table-scroll"><table>
         <tr>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}<th>Grams</th></tr>
         <tr>${NUTS.map(n=>`<td class="mono">${round1(totals[n])}</td>`).join('')}<td class="mono">${round0(totals.grams)}</td></tr>
-      </table>
+      </table></div>
 
       <div class="section-title">vs targets — ${plateSlot}, ${plateDate}</div>
       <div class="grid2">
@@ -792,7 +847,7 @@ function renderLogSlot(slot, entries){
   const rows = entries.filter(e=>e.slot===slot);
   return `
     <div class="meal-slot-header"><h3>${slot}</h3></div>
-    <table>
+    <div class="table-scroll"><table>
       <tr><th>Person</th><th>Item</th><th>Grams</th><th>Cal</th><th>P</th><th>C</th><th>F</th><th></th></tr>
       ${rows.map(e=>`
         <tr>
@@ -806,7 +861,7 @@ function renderLogSlot(slot, entries){
           <td><button class="btn danger" style="padding:2px 7px;" onclick="deleteLogEntry('${slot}','${e.id}')">×</button></td>
         </tr>
       `).join('') || `<tr><td colspan="8" class="empty">Nothing logged for ${slot} yet.</td></tr>`}
-    </table>
+    </table></div>
   `;
 }
 async function deleteLogEntry(slot, id){
@@ -855,6 +910,9 @@ function renderPersonToday(p, cfg, entries){
   const dayConsumed = {cal:0,protein:0,carb:0,fat:0,fibre:0};
   mine.forEach(e=>{ dayConsumed.cal+=e.cal; dayConsumed.protein+=e.protein; dayConsumed.carb+=e.carb; dayConsumed.fat+=e.fat; dayConsumed.fibre+=e.fibre||0; });
   const dayPct = clamp(dayConsumed.cal/Math.max(mt.day.cal,1)*100,0,140);
+  const proteinPct = clamp(dayConsumed.protein/Math.max(mt.day.protein,1)*100,0,140);
+  const carbPct = clamp(dayConsumed.carb/Math.max(mt.day.carb,1)*100,0,140);
+  const fatPct = clamp(dayConsumed.fat/Math.max(mt.day.fat,1)*100,0,140);
   return `
     <div class="person-card">
       <h3>${p.name}</h3>
@@ -863,8 +921,11 @@ function renderPersonToday(p, cfg, entries){
       <div class="stat"><span>Cal</span><b>${round0(dayConsumed.cal)} / ${round0(mt.day.cal)}</b></div>
       <div class="bar-wrap"><div class="bar ${dayPct>100?'over':''}" style="width:${Math.min(dayPct,100)}%;"></div></div>
       <div class="stat"><span>Protein</span><b>${round1(dayConsumed.protein)} / ${round1(mt.day.protein)}</b></div>
+      <div class="bar-wrap"><div class="bar ${proteinPct>100?'over':''}" style="width:${Math.min(proteinPct,100)}%;"></div></div>
       <div class="stat"><span>Carb</span><b>${round1(dayConsumed.carb)} / ${round1(mt.day.carb)}</b></div>
+      <div class="bar-wrap"><div class="bar ${carbPct>100?'over':''}" style="width:${Math.min(carbPct,100)}%;"></div></div>
       <div class="stat"><span>Fat</span><b>${round1(dayConsumed.fat)} / ${round1(mt.day.fat)}</b></div>
+      <div class="bar-wrap"><div class="bar ${fatPct>100?'over':''}" style="width:${Math.min(fatPct,100)}%;"></div></div>
       <div class="stat"><span>Fibre</span><b>${round1(dayConsumed.fibre)} / ${p.fibreTarget?round0(p.fibreTarget):'—'}</b></div>
     </div>
   `;
@@ -885,7 +946,7 @@ function renderWeek(root){
     </div>
     <div class="panel">
       <div class="section-title">Day-by-day</div>
-      <table>
+      <div class="table-scroll"><table>
         <tr><th>Date</th>${cfg.people.map(p=>`<th>${p.name} Cal</th>`).join('')}</tr>
         ${dates.map(d=>{
           const entries = STATE.logs[d]||[];
@@ -894,7 +955,7 @@ function renderWeek(root){
             return `<td class="mono">${round0(c)}</td>`;
           }).join('')}</tr>`;
         }).join('') || '<tr><td class="empty">No logged days yet.</td></tr>'}
-      </table>
+      </table></div>
     </div>
   `;
 }
@@ -913,11 +974,11 @@ function renderPersonWeek(p, cfg, dates){
   return `
     <div class="person-card">
       <h3>${p.name}</h3>
-      <table>
+      <div class="table-scroll"><table>
         <tr><th></th>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}</tr>
         <tr><td class="mono">Avg/day</td>${NUTS.map(k=>`<td class="mono">${round1(sums[k]/n)}</td>`).join('')}</tr>
         <tr><td class="mono">Target</td><td class="mono">${round0(mt.day.cal)}</td><td class="mono">${round1(mt.day.protein)}</td><td class="mono">${round1(mt.day.carb)}</td><td class="mono">${round1(mt.day.fat)}</td><td>—</td><td>—</td><td>—</td></tr>
-      </table>
+      </table></div>
     </div>
   `;
 }

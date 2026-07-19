@@ -131,6 +131,7 @@
 const SHARED = true;
 async function sget(key){ try{ const r = await window.storage.get(key, SHARED); return r ? JSON.parse(r.value) : null; }catch(e){ return null; } }
 async function sset(key, val){ try{ await window.storage.set(key, JSON.stringify(val), SHARED); }catch(e){ console.error('save failed', e); toast('Save failed — try again'); } }
+async function ssetQuiet(key, val){ try{ await window.storage.set(key, JSON.stringify(val), SHARED); return true; }catch(e){ console.error('background save failed (non-critical, will retry next load)', e); return false; } }
 async function slist(prefix){ try{ const r = await window.storage.list(prefix, SHARED); return r ? r.keys : []; }catch(e){ return []; } }
 
 function toast(msg){
@@ -255,15 +256,15 @@ async function loadAll(){
   if(STATE.config.people[0].name !== 'NJ' || STATE.config.people[1].name !== 'MB'){
     STATE.config.people[0].name = 'NJ';
     STATE.config.people[1].name = 'MB';
-    await sset('config', STATE.config);
+    await ssetQuiet('config', STATE.config);
   }
   if(STATE.config.people[0].weightKg === 70 && !STATE.config.people[0].fibreTarget){
     STATE.config.people[0].weightKg = 65;
     STATE.config.people[0].fibreTarget = 25;
     STATE.config.people[1].weightKg = 71;
     STATE.config.people[1].fibreTarget = 30;
-    await sset('config', STATE.config);
-    toast('Weight/fibre targets updated to 65/25 and 71/30');
+    const ok = await ssetQuiet('config', STATE.config);
+    if(ok) toast('Weight/fibre targets updated to 65/25 and 71/30');
   }
   STATE.foods = await sget('foods-list') || {};
   const existingHoney = Object.values(STATE.foods).find(f=>f.name==='Honey' && f.unit==='g');
@@ -276,16 +277,16 @@ async function loadAll(){
     existingHoney.fibre = Math.round(existingHoney.fibre*0.07*100)/100;
     existingHoney.sugar = Math.round(existingHoney.sugar*0.07*10)/10;
     existingHoney.salt = Math.round(existingHoney.salt*0.07*10000)/10000;
-    await sset('foods-list', STATE.foods);
-    toast('Honey switched to per-tsp values');
+    const honeyOk = await ssetQuiet('foods-list', STATE.foods);
+    if(honeyOk) toast('Honey switched to per-tsp values');
   }
   if(Object.keys(STATE.foods).length === 0 && SEED_FOODS.length){
     SEED_FOODS.forEach(f=>{
       const id = uid();
       STATE.foods[id] = {id, ...f};
     });
-    await sset('foods-list', STATE.foods);
-    toast('Imported ' + SEED_FOODS.length + ' items from your spreadsheet');
+    const seedOk = await ssetQuiet('foods-list', STATE.foods);
+    if(seedOk) toast('Imported ' + SEED_FOODS.length + ' items from your spreadsheet');
   }
   const logKeys = await slist('log:');
   STATE.logs = {};
@@ -311,6 +312,7 @@ function render(){
       ${tabBtn('build','Batch Cook')}
       ${tabBtn('config','Config')}
       ${tabBtn('foods','Master List')}
+      ${tabBtn('data','Data')}
     </nav>
     <div id="tabroot"></div>
   `;
@@ -321,6 +323,7 @@ function render(){
   else if(STATE.tab==='log') renderLog(root);
   else if(STATE.tab==='today') renderToday(root);
   else if(STATE.tab==='week') renderWeek(root);
+  else if(STATE.tab==='data') renderData(root);
 }
 function tabBtn(id,label){
   return `<button class="${STATE.tab===id?'active':''}" onclick="setTab('${id}')">${label}</button>`;
@@ -991,6 +994,53 @@ function renderPersonWeek(p, cfg, dates){
       </table></div>
     </div>
   `;
+}
+
+// ============================================================
+// DATA TAB — full day-by-day log, CSV export
+// ============================================================
+function renderData(root){
+  const cfg = STATE.config;
+  const dates = Object.keys(STATE.logs).sort().reverse();
+  root.innerHTML = `
+    <div class="panel">
+      <div class="flex-between">
+        <div class="section-title" style="border:none;margin:0;">All logged days (${dates.length})</div>
+        <button class="btn" onclick="exportLogCSV()">Download CSV</button>
+      </div>
+      <p class="small">Every day you've logged, oldest at the bottom. For deeper analysis, download the CSV — it has every individual entry (date, meal, person, food, grams, and full macros), not just daily calorie totals.</p>
+      <div class="table-scroll"><table>
+        <tr><th>Date</th>${cfg.people.map(p=>`<th>${p.name} Cal</th>`).join('')}</tr>
+        ${dates.map(d=>{
+          const entries = STATE.logs[d]||[];
+          return `<tr><td class="mono">${d}</td>${cfg.people.map(p=>{
+            const c = entries.filter(e=>e.person===p.id).reduce((s,e)=>s+e.cal,0);
+            return `<td class="mono">${round0(c)}</td>`;
+          }).join('')}</tr>`;
+        }).join('') || '<tr><td class="empty">No logged days yet.</td></tr>'}
+      </table></div>
+    </div>
+  `;
+}
+function csvEscape(v){
+  const s = String(v??'');
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function exportLogCSV(){
+  const rows = [['Date','Slot','Person','Food','Grams','Cal','Protein','Carb','Fat','Fibre','Sugar','Salt']];
+  Object.keys(STATE.logs).sort().forEach(date=>{
+    STATE.logs[date].forEach(e=>{
+      rows.push([date, e.slot, personName(e.person), e.foodName, e.grams, e.cal, e.protein, e.carb, e.fat, e.fibre, e.sugar, e.salt]);
+    });
+  });
+  const csv = rows.map(r=>r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `shredder-log-${todayStr()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast('CSV downloaded');
 }
 
 // ---------- boot ----------

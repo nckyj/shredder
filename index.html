@@ -124,12 +124,44 @@
 <div class="app" id="app"></div>
 <div class="toast" id="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script>
-// ---------- storage helpers ----------
-const SHARED = true;
-async function sget(key){ try{ const r = await window.storage.get(key, SHARED); return r ? JSON.parse(r.value) : null; }catch(e){ return null; } }
-async function sset(key, val){ try{ await window.storage.set(key, JSON.stringify(val), SHARED); }catch(e){ console.error('save failed', e); toast('Save failed — try again'); } }
-async function slist(prefix){ try{ const r = await window.storage.list(prefix, SHARED); return r ? r.keys : []; }catch(e){ return []; } }
+// ============================================================
+// ONE-TIME SETUP — paste your own Firebase config below.
+// See setup steps in the chat message that shipped this file.
+// ============================================================
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  projectId: "PASTE_YOUR_PROJECT_ID",
+  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+  messagingSenderId: "PASTE_YOUR_SENDER_ID",
+  appId: "PASTE_YOUR_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ---------- storage helpers (Firestore-backed, shared across devices) ----------
+async function sget(key){
+  try{
+    const doc = await db.collection('kv').doc(key).get();
+    if(!doc.exists) return null;
+    return JSON.parse(doc.data().value);
+  }catch(e){ console.error('load failed', e); return null; }
+}
+async function sset(key, val){
+  try{
+    await db.collection('kv').doc(key).set({ value: JSON.stringify(val) });
+  }catch(e){ console.error('save failed', e); toast('Save failed — try again'); }
+}
+async function slist(prefix){
+  try{
+    const snap = await db.collection('kv').get();
+    return snap.docs.map(d=>d.id).filter(id=>id.startsWith(prefix));
+  }catch(e){ console.error('list failed', e); return []; }
+}
+
 
 function toast(msg){
   const t = document.getElementById('toast');

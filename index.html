@@ -38,7 +38,6 @@
     font-size:14px;font-family:inherit;color:var(--ink);
   }
   input[type=number]{font-family:"Menlo",monospace;}
-  input[type=date]{width:160px;}
   .row{display:flex;gap:10px;margin-bottom:10px;align-items:flex-end;flex-wrap:wrap;}
   .row > div{flex:1;min-width:110px;}
   button.btn{
@@ -88,7 +87,6 @@
   .ing-row .ing-amount input{width:100%;}
   .ing-row .ing-assign{flex:1 1 140px;min-width:0;}
   .ing-row .ing-del{flex:none;}
-  .split-block{flex:2 1 220px;min-width:0;}
 
   @media(max-width:640px){
     .app{padding:10px 10px 60px;}
@@ -118,7 +116,7 @@
     .ing-row .ing-amount{flex:1 1 70px;}
     .ing-row .ing-assign{flex:2 1 120px;}
     .ing-row .ing-del button{padding:8px 12px;}
-    .split-block{flex:1 1 100%;}
+    input[type=file]{padding:6px;font-size:13px;}
   }
 </style>
 </head>
@@ -128,11 +126,29 @@
 
 <script>
 // ---------- storage helpers ----------
-const SHARED = true;
-async function sget(key){ try{ const r = await window.storage.get(key, SHARED); return r ? JSON.parse(r.value) : null; }catch(e){ return null; } }
-async function sset(key, val){ try{ await window.storage.set(key, JSON.stringify(val), SHARED); }catch(e){ console.error('save failed', e); toast('Save failed — try again'); } }
-async function ssetQuiet(key, val){ try{ await window.storage.set(key, JSON.stringify(val), SHARED); return true; }catch(e){ console.error('background save failed (non-critical, will retry next load)', e); return false; } }
-async function slist(prefix){ try{ const r = await window.storage.list(prefix, SHARED); return r ? r.keys : []; }catch(e){ return []; } }
+// Real browser localStorage, namespaced. Persists in THIS browser as long as you
+// open this same HTML file (same origin) — survives edits, reopening, restarts.
+// It does NOT sync across different browsers/devices — use Download/Restore backup for that.
+const LS_PREFIX = 'shredder:';
+async function sget(key){
+  try{ const raw = localStorage.getItem(LS_PREFIX+key); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+async function sset(key, val){
+  try{ localStorage.setItem(LS_PREFIX+key, JSON.stringify(val)); }
+  catch(e){ console.error('save failed', e); toast('Save failed — try again'); }
+}
+async function slist(prefix){
+  try{
+    const full = LS_PREFIX+prefix;
+    const out = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith(full)) out.push(k.slice(LS_PREFIX.length));
+    }
+    return out;
+  }catch(e){ return []; }
+}
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -174,8 +190,8 @@ const RANGE_TABLE = {
 
 const DEFAULT_CONFIG = {
   people: [
-    {id:'p1', name:'NJ', weightKg:65, activity:'moderate', goal:'lose', rangePoint:0, fibreTarget:25},
-    {id:'p2', name:'MB', weightKg:71, activity:'moderate', goal:'lose', rangePoint:0, fibreTarget:30}
+    {id:'p1', name:'NJ', weightKg:70, activity:'moderate', goal:'lose', rangePoint:0},
+    {id:'p2', name:'MB', weightKg:70, activity:'moderate', goal:'lose', rangePoint:0}
   ],
   macroSplit: {protein:30, carb:45, fat:25}, // %
   mealSplit: {breakfast:20, lunch:35, dinner:45} // %
@@ -256,15 +272,7 @@ async function loadAll(){
   if(STATE.config.people[0].name !== 'NJ' || STATE.config.people[1].name !== 'MB'){
     STATE.config.people[0].name = 'NJ';
     STATE.config.people[1].name = 'MB';
-    await ssetQuiet('config', STATE.config);
-  }
-  if(STATE.config.people[0].weightKg === 70 && !STATE.config.people[0].fibreTarget){
-    STATE.config.people[0].weightKg = 65;
-    STATE.config.people[0].fibreTarget = 25;
-    STATE.config.people[1].weightKg = 71;
-    STATE.config.people[1].fibreTarget = 30;
-    const ok = await ssetQuiet('config', STATE.config);
-    if(ok) toast('Weight/fibre targets updated to 65/25 and 71/30');
+    await sset('config', STATE.config);
   }
   STATE.foods = await sget('foods-list') || {};
   const existingHoney = Object.values(STATE.foods).find(f=>f.name==='Honey' && f.unit==='g');
@@ -277,16 +285,16 @@ async function loadAll(){
     existingHoney.fibre = Math.round(existingHoney.fibre*0.07*100)/100;
     existingHoney.sugar = Math.round(existingHoney.sugar*0.07*10)/10;
     existingHoney.salt = Math.round(existingHoney.salt*0.07*10000)/10000;
-    const honeyOk = await ssetQuiet('foods-list', STATE.foods);
-    if(honeyOk) toast('Honey switched to per-tsp values');
+    await sset('foods-list', STATE.foods);
+    toast('Honey switched to per-tsp values');
   }
   if(Object.keys(STATE.foods).length === 0 && SEED_FOODS.length){
     SEED_FOODS.forEach(f=>{
       const id = uid();
       STATE.foods[id] = {id, ...f};
     });
-    const seedOk = await ssetQuiet('foods-list', STATE.foods);
-    if(seedOk) toast('Imported ' + SEED_FOODS.length + ' items from your spreadsheet');
+    await sset('foods-list', STATE.foods);
+    toast('Imported ' + SEED_FOODS.length + ' items from your spreadsheet');
   }
   const logKeys = await slist('log:');
   STATE.logs = {};
@@ -447,14 +455,15 @@ function checkSplitSums(){
   const mealOk = Math.abs(mealSum-100)<0.5;
   document.getElementById('macro-sum-warn').innerHTML = macroOk
     ? `<span style="color:var(--good);">Sums to ${round0(macroSum)}%</span>`
-    : `<span style="color:var(--bad);">Sums to ${round0(macroSum)}% — won't be saved until this totals 100%</span>`;
+    : `<span style="color:var(--bad);">Sums to ${round0(macroSum)}% — must total 100%</span>`;
   document.getElementById('meal-sum-warn').innerHTML = mealOk
     ? `<span style="color:var(--good);">Sums to ${round0(mealSum)}%</span>`
-    : `<span style="color:var(--bad);">Sums to ${round0(mealSum)}% — won't be saved until this totals 100%</span>`;
+    : `<span style="color:var(--bad);">Sums to ${round0(mealSum)}% — must total 100%</span>`;
+  document.getElementById('save-config-btn').disabled = !(macroOk && mealOk);
   return macroOk && mealOk;
 }
 async function saveConfig(){
-  const splitsOk = checkSplitSums();
+  if(!checkSplitSums()){ toast('Fix split percentages first — each group must total 100%'); return; }
   const cfg = STATE.config;
   cfg.people.forEach((p,i)=>{
     p.weightKg = parseFloat(document.getElementById(`p${i}-weight`).value)||p.weightKg;
@@ -463,20 +472,18 @@ async function saveConfig(){
     p.rangePoint = parseFloat(document.getElementById(`p${i}-point`).value)||0;
     p.fibreTarget = parseFloat(document.getElementById(`p${i}-fibre`).value)||0;
   });
-  if(splitsOk){
-    cfg.macroSplit = {
-      protein: parseFloat(document.getElementById('ms-protein').value)||0,
-      carb: parseFloat(document.getElementById('ms-carb').value)||0,
-      fat: parseFloat(document.getElementById('ms-fat').value)||0,
-    };
-    cfg.mealSplit = {
-      breakfast: parseFloat(document.getElementById('sp-breakfast').value)||0,
-      lunch: parseFloat(document.getElementById('sp-lunch').value)||0,
-      dinner: parseFloat(document.getElementById('sp-dinner').value)||0,
-    };
-  }
+  cfg.macroSplit = {
+    protein: parseFloat(document.getElementById('ms-protein').value)||0,
+    carb: parseFloat(document.getElementById('ms-carb').value)||0,
+    fat: parseFloat(document.getElementById('ms-fat').value)||0,
+  };
+  cfg.mealSplit = {
+    breakfast: parseFloat(document.getElementById('sp-breakfast').value)||0,
+    lunch: parseFloat(document.getElementById('sp-lunch').value)||0,
+    dinner: parseFloat(document.getElementById('sp-dinner').value)||0,
+  };
   await sset('config', cfg);
-  toast(splitsOk ? 'Config saved' : 'Saved weight/goal/fibre — fix the % splits to save those too');
+  toast('Config saved');
   render();
 }
 
@@ -497,7 +504,7 @@ function renderFoods(root){
         <div class="section-title" style="border:none;margin:0;">Add an ingredient</div>
       </div>
       <div class="row">
-        <div class="split-block"><label>Name</label><input id="nf-name" placeholder="e.g. Chicken breast (raw)"></div>
+        <div style="flex:2;"><label>Name</label><input id="nf-name" placeholder="e.g. Chicken breast (raw)"></div>
         <div><label>Per</label>
           <select id="nf-unit" onchange="document.getElementById('nf-basis').textContent=unitLabel(this.value)">
             <option value="g">100 g</option><option value="ml">100 ml</option>
@@ -586,7 +593,7 @@ function renderBuild(root){
     <div class="panel">
       <div class="section-title">Batch meal builder</div>
       <div class="row">
-        <div class="split-block"><label>Meal name</label><input id="bm-name" placeholder="e.g. Marry Me Chicken"></div>
+        <div style="flex:2;"><label>Meal name</label><input id="bm-name" placeholder="e.g. Marry Me Chicken"></div>
         <div><label>Batch date</label><input type="date" id="bm-date" value="${todayStr()}"></div>
       </div>
       <div id="build-lines">
@@ -692,7 +699,7 @@ function renderLog(root){
             <option value="dinner" ${plateSlot==='dinner'?'selected':''}>Dinner</option>
           </select>
         </div>
-        <div class="split-block">
+        <div style="flex:2;min-width:220px;">
           <label>Split this plate</label>
           <div class="flex-between" style="margin-bottom:2px;">
             <span class="mono small">${p1.name} ${plateSplitPct}%</span>
@@ -892,7 +899,7 @@ function renderToday(root){
   const entries = STATE.logs[date]||[];
   root.innerHTML = `
     <div class="panel">
-      <div class="row"><div style="max-width:220px;"><label>Date</label><input type="date" id="td-date" value="${date}" onchange="STATE.currentDate=this.value; renderToday(document.getElementById('tabroot'))"></div></div>
+      <div class="row"><div><label>Date</label><input type="date" id="td-date" value="${date}" onchange="STATE.currentDate=this.value; renderToday(document.getElementById('tabroot'))"></div></div>
     </div>
     <div class="grid2">
       ${cfg.people.map(p=>renderPersonToday(p,cfg,entries)).join('')}
@@ -997,36 +1004,79 @@ function renderPersonWeek(p, cfg, dates){
 }
 
 // ============================================================
-// DATA TAB — full day-by-day log, CSV export
+// DATA TAB — backup, restore, CSV export
 // ============================================================
 function renderData(root){
-  const cfg = STATE.config;
-  const dates = Object.keys(STATE.logs).sort().reverse();
+  const names = STATE.config.people.map(p=>p.name).join(' & ');
+  const dayCount = Object.keys(STATE.logs).length;
   root.innerHTML = `
     <div class="panel">
-      <div class="flex-between">
-        <div class="section-title" style="border:none;margin:0;">All logged days (${dates.length})</div>
-        <button class="btn" onclick="exportLogCSV()">Download CSV</button>
+      <div class="section-title">Backup everything</div>
+      <p class="small">Save a complete copy of config, master list, and all logged days as a JSON file.</p>
+      <button class="btn" onclick="downloadBackup()">Download backup</button>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">Restore a backup</div>
+      <p class="small">Replace this shared data with a previous Shredder backup file. This overwrites current config, master list, and logs — for both ${names}.</p>
+      <div class="row">
+        <div><input type="file" id="restore-file" accept="application/json"></div>
       </div>
-      <p class="small">Every day you've logged, oldest at the bottom. For deeper analysis, download the CSV — it has every individual entry (date, meal, person, food, grams, and full macros), not just daily calorie totals.</p>
-      <div class="table-scroll"><table>
-        <tr><th>Date</th>${cfg.people.map(p=>`<th>${p.name} Cal</th>`).join('')}</tr>
-        ${dates.map(d=>{
-          const entries = STATE.logs[d]||[];
-          return `<tr><td class="mono">${d}</td>${cfg.people.map(p=>{
-            const c = entries.filter(e=>e.person===p.id).reduce((s,e)=>s+e.cal,0);
-            return `<td class="mono">${round0(c)}</td>`;
-          }).join('')}</tr>`;
-        }).join('') || '<tr><td class="empty">No logged days yet.</td></tr>'}
-      </table></div>
+      <button class="btn secondary" onclick="restoreBackup()">Choose backup &amp; restore</button>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">Export spreadsheet</div>
+      <p class="small">Download every logged entry (${dayCount} day${dayCount===1?'':'s'}) as a CSV for analysis.</p>
+      <button class="btn" onclick="exportCSV()">Export CSV</button>
+    </div>
+
+    <div class="panel" style="background:var(--track);border:none;">
+      <div class="section-title" style="border:none;margin:0 0 6px;">Stored data</div>
+      <p class="small">Config, master list and logs are saved in this browser's local storage, tied to this file. They persist across closing/reopening this file on this device. They do <b>not</b> sync to other browsers or devices — if ${names} use different devices, one of you should download a backup and the other should restore it to stay in sync. Do this any time you want to bring a second device up to date.</p>
     </div>
   `;
+}
+async function downloadBackup(){
+  const backup = {
+    app:'shredder', exportedAt: new Date().toISOString(),
+    config: STATE.config, foods: STATE.foods, logs: STATE.logs
+  };
+  const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `shredder-backup-${todayStr()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded');
+}
+async function restoreBackup(){
+  const input = document.getElementById('restore-file');
+  if(!input.files || !input.files[0]){ toast('Choose a file first'); return; }
+  try{
+    const text = await input.files[0].text();
+    const data = JSON.parse(text);
+    if(!data.config || !data.foods){ toast("That file doesn't look like a Shredder backup"); return; }
+    STATE.config = data.config;
+    STATE.foods = data.foods;
+    STATE.logs = data.logs || {};
+    await sset('config', STATE.config);
+    await sset('foods-list', STATE.foods);
+    for(const date of Object.keys(STATE.logs)){
+      await sset('log:'+date, STATE.logs[date]);
+    }
+    toast('Backup restored');
+    render();
+  }catch(e){
+    console.error(e);
+    toast('Could not read that file');
+  }
 }
 function csvEscape(v){
   const s = String(v??'');
   return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
 }
-function exportLogCSV(){
+function exportCSV(){
   const rows = [['Date','Slot','Person','Food','Grams','Cal','Protein','Carb','Fat','Fibre','Sugar','Salt']];
   Object.keys(STATE.logs).sort().forEach(date=>{
     STATE.logs[date].forEach(e=>{
@@ -1040,7 +1090,7 @@ function exportLogCSV(){
   a.href = url; a.download = `shredder-log-${todayStr()}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
-  toast('CSV downloaded');
+  toast('CSV exported');
 }
 
 // ---------- boot ----------

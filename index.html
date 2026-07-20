@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Shredder</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3E6259">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shredder">
+<style>
+  :root{
+    --bg:#F7F5F0; --panel:#FFFFFF; --ink:#1E2A26; --muted:#6B7570;
+    --line:#E2E0D8; --accent:#3E6259; --accent2:#B5652A; --warn:#B5652A;
+    --good:#3E6259; --bad:#A13D3D; --track:#EDEAE2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family: "Iowan Old Style","Georgia",serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:"Menlo","Consolas",monospace;}
+  h1,h2,h3{font-family:"Iowan Old Style","Georgia",serif; font-weight:600; margin:0 0 8px;}
+  .app{max-width:1000px;margin:0 auto;padding:14px 14px 60px;}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+  header h1{font-size:22px;letter-spacing:.2px;}
+  header .tag{color:var(--muted);font-size:12px;font-family:"Menlo",monospace;text-transform:uppercase;letter-spacing:1px;}
+  nav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:16px;padding-bottom:0;}
+  nav button{
+    background:none;border:none;padding:10px 14px;font-size:13px;font-family:"Menlo",monospace;
+    text-transform:uppercase;letter-spacing:.5px;color:var(--muted);cursor:pointer;white-space:nowrap;
+    border-bottom:2px solid transparent;
+  }
+  nav button.active{color:var(--ink);border-bottom:2px solid var(--accent2);}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr;}}
+  label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px;font-family:"Menlo",monospace;}
+  input,select{
+    width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:#FCFBF8;
+    font-size:14px;font-family:inherit;color:var(--ink);
+  }
+  input[type=number]{font-family:"Menlo",monospace;}
+  .row{display:flex;gap:10px;margin-bottom:10px;align-items:flex-end;flex-wrap:wrap;}
+  .row > div{flex:1;min-width:110px;}
+  button.btn{
+    background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;
+    font-size:13px;font-family:"Menlo",monospace;text-transform:uppercase;letter-spacing:.5px;
+  }
+  button.btn.secondary{background:none;color:var(--accent);border:1px solid var(--accent);}
+  button.btn.danger{background:none;color:var(--bad);border:1px solid var(--bad);}
+  button.btn:disabled{opacity:.4;cursor:default;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);}
+  th{font-family:"Menlo",monospace;font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;}
+  tr.x-row{opacity:.55;}
+  .pill{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-family:"Menlo",monospace;text-transform:uppercase;}
+  .pill.high{background:#DCE7DE;color:var(--accent);}
+  .pill.med{background:#F1E6D3;color:var(--accent2);}
+  .pill.low{background:var(--track);color:var(--muted);}
+  .pill.x{background:#F3DEDA;color:var(--bad);}
+  .bar-wrap{background:var(--track);border-radius:6px;height:8px;overflow:hidden;margin-top:4px;}
+  .bar{height:100%;border-radius:6px;background:var(--accent);}
+  .bar.over{background:var(--bad);}
+  .stat{display:flex;justify-content:space-between;font-size:12px;margin-top:2px;color:var(--muted);font-family:"Menlo",monospace;}
+  .stat b{color:var(--ink);}
+  .section-title{font-family:"Menlo",monospace;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:18px 0 8px;border-top:1px solid var(--line);padding-top:14px;}
+  .section-title:first-child{border-top:none;padding-top:0;margin-top:0;}
+  .person-card{border:1px solid var(--line);border-radius:8px;padding:12px;}
+  .person-card h3{font-size:15px;margin-bottom:10px;color:var(--accent);}
+  .small{font-size:11px;color:var(--muted);}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:8px 16px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:99;font-family:"Menlo",monospace;}
+  .toast.show{opacity:.92;}
+  .searchbox{position:relative;}
+  .flex-between{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+  .food-line{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .food-line .name{flex:2;}
+  .food-line input{max-width:80px;}
+  .meal-slot-header{display:flex;justify-content:space-between;align-items:baseline;margin-top:16px;}
+  .meal-slot-header h3{font-size:14px;color:var(--accent2);text-transform:uppercase;letter-spacing:.5px;font-family:"Menlo",monospace;}
+  .daylist{max-height:340px;overflow:auto;}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:10px 0;}
+  .tag-x{cursor:pointer;}
+  select.unit{max-width:70px;}
+  .num-tight{width:70px;flex:none;}
+  .ing-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+  .ing-row .ing-food{flex:2 1 200px;min-width:0;}
+  .ing-row .ing-amount{flex:0 0 90px;}
+  .ing-row .ing-amount input{width:100%;}
+  .ing-row .ing-assign{flex:1 1 140px;min-width:0;}
+  .ing-row .ing-del{flex:none;}
+
+  @media(max-width:640px){
+    .app{padding:10px 10px 60px;}
+    header h1{font-size:19px;}
+    header .tag{font-size:10px;}
+    nav{gap:2px;}
+    nav button{padding:10px 10px;font-size:12px;}
+    .panel{padding:12px;border-radius:8px;}
+    label{font-size:12px;}
+    input,select{padding:10px 9px;font-size:16px;}
+    .row{gap:8px;}
+    .row > div{min-width:0;flex:1 1 46%;}
+    .num-tight{width:auto;flex:1 1 70px;}
+    button.btn{padding:11px 14px;font-size:13px;}
+    table{font-size:12px;}
+    th,td{padding:7px 5px;}
+    .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .table-scroll table{min-width:560px;}
+    .grid2{gap:10px;}
+    .person-card{padding:10px;}
+    .person-card h3{font-size:16px;}
+    .food-line input{max-width:64px;}
+    .stat{font-size:12px;}
+    .toast{font-size:12px;padding:8px 14px;max-width:90%;}
+    .ing-row{gap:6px;}
+    .ing-row .ing-food{flex:1 1 100%;}
+    .ing-row .ing-amount{flex:1 1 70px;}
+    .ing-row .ing-assign{flex:2 1 120px;}
+    .ing-row .ing-del button{padding:8px 12px;}
+    input[type=file]{padding:6px;font-size:13px;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- Supabase storage helpers ----------
+const SUPABASE_URL = 'https://ztiztcpnuekxulcntcvx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ZXc68uMSEXsDIsJUKDtYdA_RM33nafd';
+
+async function sbFetch(path, options={}){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      ...(options.headers||{})
+    }
+  });
+  if(!res.ok){
+    const t = await res.text().catch(()=> '');
+    throw new Error(`Supabase ${res.status}: ${t}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function getConfig(){
+  const rows = await sbFetch('config?id=eq.1&select=data');
+  return (rows && rows[0]) ? rows[0].data : null;
+}
+async function saveConfigToDb(cfg){
+  await sbFetch('config', {
+    method:'POST',
+    headers:{ 'Prefer':'resolution=merge-duplicates' },
+    body: JSON.stringify([{id:1, data:cfg}])
+  });
+}
+
+function foodToRow(f){
+  return {
+    id:f.id, name:f.name, unit:f.unit, is_x:!!f.isX, is_meal:!!f.isMeal,
+    cal:f.cal||0, protein:f.protein||0, carb:f.carb||0, fat:f.fat||0,
+    fibre:f.fibre||0, sugar:f.sugar||0, salt:f.salt||0,
+    batch_date:f.batchDate||null, batch_weight:f.batchWeight||null, raw_weight:f.rawWeight||null
+  };
+}
+function rowToFood(r){
+  return {
+    id:r.id, name:r.name, unit:r.unit, isX:r.is_x, isMeal:r.is_meal,
+    cal:r.cal, protein:r.protein, carb:r.carb, fat:r.fat, fibre:r.fibre, sugar:r.sugar, salt:r.salt,
+    batchDate:r.batch_date, batchWeight:r.batch_weight, rawWeight:r.raw_weight
+  };
+}
+async function getFoods(){
+  const rows = await sbFetch('foods?select=*');
+  const out = {};
+  (rows||[]).forEach(r=> out[r.id] = rowToFood(r));
+  return out;
+}
+async function upsertFood(f){
+  await sbFetch('foods', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body: JSON.stringify([foodToRow(f)]) });
+}
+async function upsertFoods(list){
+  if(!list.length) return;
+  await sbFetch('foods', { method:'POST', headers:{'Prefer':'resolution=merge-duplicates'}, body: JSON.stringify(list.map(foodToRow)) });
+}
+async function deleteFoodDb(id){
+  await sbFetch(`foods?id=eq.${id}`, { method:'DELETE' });
+}
+
+function logToRow(e, date){
+  return {
+    id:e.id, date: date||e.date, slot:e.slot, person:e.person, food_name:e.foodName, grams:e.grams,
+    cal:e.cal||0, protein:e.protein||0, carb:e.carb||0, fat:e.fat||0,
+    fibre:e.fibre||0, sugar:e.sugar||0, salt:e.salt||0
+  };
+}
+function rowToLog(r){
+  return { id:r.id, person:r.person, slot:r.slot, foodName:r.food_name, grams:r.grams,
+    cal:r.cal, protein:r.protein, carb:r.carb, fat:r.fat, fibre:r.fibre, sugar:r.sugar, salt:r.salt };
+}
+async function getAllLogs(){
+  const rows = await sbFetch('logs?select=*&order=date.asc');
+  const out = {};
+  (rows||[]).forEach(r=>{
+    if(!out[r.date]) out[r.date]=[];
+    out[r.date].push(rowToLog(r));
+  });
+  return out;
+}
+async function insertLogRows(rows, date, upsert){
+  if(!rows.length) return;
+  const opts = { method:'POST', body: JSON.stringify(rows.map(e=>logToRow(e,date))) };
+  if(upsert) opts.headers = {'Prefer':'resolution=merge-duplicates'};
+  await sbFetch('logs', opts);
+}
+async function deleteLogRow(id){
+  await sbFetch(`logs?id=eq.${id}`, { method:'DELETE' });
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window.__toastT);
+  window.__toastT = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function safeRerender(renderFn){
+  const root = document.getElementById('tabroot');
+  const active = document.activeElement;
+  const id = active && active.id;
+  const start = (active && typeof active.selectionStart==='number') ? active.selectionStart : null;
+  const end = (active && typeof active.selectionEnd==='number') ? active.selectionEnd : null;
+  renderFn(root);
+  if(id){
+    const el = document.getElementById(id);
+    if(el){
+      el.focus();
+      if(start!=null && el.setSelectionRange){ try{ el.setSelectionRange(start,end); }catch(e){} }
+    }
+  }
+}
+function todayStr(d=new Date()){ return d.toISOString().slice(0,10); }
+function round1(n){ return Math.ceil(n); }
+function round0(n){ return Math.ceil(n); }
+function clamp(n,a,b){ return Math.max(a,Math.min(b,n)); }
+const NUTS = ['cal','protein','carb','fat','fibre','sugar','salt'];
+const NUT_LABELS = {cal:'Cals',protein:'Protein',carb:'Carbs',fat:'Fat',fibre:'Fibre',sugar:'Sugar',salt:'Salt'};
+
+const SEED_FOODS = [{"name": "Almond Milk", "unit": "ml", "isX": false, "isMeal": false, "cal": 56.0, "carb": 10.5, "fat": 1.5, "protein": 0.2, "fibre": 0.2, "sugar": 4.7, "salt": 0.01}, {"name": "Avocado", "unit": "g", "isX": false, "isMeal": false, "cal": 161.0, "carb": 8.5, "fat": 14.5, "protein": 2.0, "fibre": 0, "sugar": 0, "salt": 0}, {"name": "Banana", "unit": "g", "isX": false, "isMeal": false, "cal": 89.0, "carb": 22.8, "fat": 0.3, "protein": 1.1, "fibre": 2.6, "sugar": 12.2, "salt": 0.0}, {"name": "Beef mince", "unit": "g", "isX": false, "isMeal": false, "cal": 199.0, "carb": 1.8, "fat": 13.0, "protein": 18.0, "fibre": 0, "sugar": 0, "salt": 0}, {"name": "Beef stock (basic)", "unit": "ml", "isX": false, "isMeal": false, "cal": 6.0, "carb": 0.4, "fat": 0.4, "protein": 0.4, "fibre": 0.0, "sugar": 0.4, "salt": 0.087}, {"name": "Beef stock (rich)", "unit": "ml", "isX": false, "isMeal": false, "cal": 7.0, "carb": 0.4, "fat": 0.4, "protein": 0.4, "fibre": 0.0, "sugar": 0.4, "salt": 0.087}, {"name": "Beetroot", "unit": "g", "isX": false, "isMeal": false, "cal": 44.0, "carb": 9.6, "fat": 0.2, "protein": 1.7, "fibre": 2.0, "sugar": 7.0, "salt": 0.008}, {"name": "Black Beans", "unit": "g", "isX": false, "isMeal": false, "cal": 132.0, "carb": 23.7, "fat": 0.5, "protein": 8.9, "fibre": 8.7, "sugar": 0.3, "salt": 0.001}, {"name": "Blueberries", "unit": "g", "isX": false, "isMeal": false, "cal": 57.0, "carb": 14.5, "fat": 0.3, "protein": 0.7, "fibre": 2.4, "sugar": 10.0, "salt": 0.0}, {"name": "Broccoli", "unit": "g", "isX": false, "isMeal": false, "cal": 35.0, "carb": 7.2, "fat": 0.4, "protein": 2.4, "fibre": 3.3, "sugar": 1.4, "salt": 0.002}, {"name": "Bulgur", "unit": "g", "isX": false, "isMeal": false, "cal": 83.0, "carb": 18.6, "fat": 0.2, "protein": 3.1, "fibre": 4.5, "sugar": 0.1, "salt": 0.001}, {"name": "Butter", "unit": "g", "isX": false, "isMeal": false, "cal": 717.0, "carb": 0.1, "fat": 81.1, "protein": 0.9, "fibre": 0.0, "sugar": 0.1, "salt": 0.002}, {"name": "Cacao Powder (Continente)", "unit": "g", "isX": false, "isMeal": false, "cal": 331.0, "carb": 45.3, "fat": 4.2, "protein": 15.0, "fibre": 25.0, "sugar": 37.2, "salt": 0.015}, {"name": "Cheddar", "unit": "g", "isX": false, "isMeal": false, "cal": 402.0, "carb": 1.3, "fat": 33.1, "protein": 24.9, "fibre": 0.0, "sugar": 0.5, "salt": 1.8}, {"name": "Chia Seeds", "unit": "g", "isX": false, "isMeal": false, "cal": 486.0, "carb": 42.1, "fat": 30.7, "protein": 16.5, "fibre": 34.4, "sugar": 0.0, "salt": 0.0}, {"name": "Chicken breast (cooked)", "unit": "g", "isX": false, "isMeal": false, "cal": 165.0, "carb": 0.0, "fat": 3.6, "protein": 31.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.074}, {"name": "Chicken breast (raw)", "unit": "g", "isX": false, "isMeal": false, "cal": 120.0, "carb": 0.0, "fat": 2.6, "protein": 23.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.01}, {"name": "Chicken brown (thigh)", "unit": "g", "isX": false, "isMeal": false, "cal": 209.0, "carb": 0.0, "fat": 10.9, "protein": 26.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.01}, {"name": "Chicken stock (500ml)", "unit": "ml", "isX": false, "isMeal": false, "cal": 7.0, "carb": 0.5, "fat": 0.5, "protein": 0.4, "fibre": 0.4, "sugar": 0.4, "salt": 0.092}, {"name": "Chickpeas", "unit": "g", "isX": false, "isMeal": false, "cal": 164.0, "carb": 27.4, "fat": 2.6, "protein": 8.9, "fibre": 7.6, "sugar": 4.8, "salt": 0.006}, {"name": "Corn tinned", "unit": "g", "isX": false, "isMeal": false, "cal": 80.0, "carb": 10.8, "fat": 1.895, "protein": 2.9, "fibre": 3.8, "sugar": 5.2, "salt": 0.04}, {"name": "Courgette", "unit": "g", "isX": false, "isMeal": false, "cal": 17.0, "carb": 3.1, "fat": 0.3, "protein": 1.2, "fibre": 1.1, "sugar": 1.5, "salt": 0.001}, {"name": "Cucumber (raw)", "unit": "g", "isX": false, "isMeal": false, "cal": 16.0, "carb": 3.6, "fat": 0.1, "protein": 0.7, "fibre": 0.5, "sugar": 1.7, "salt": 0.001}, {"name": "Dried Apricots", "unit": "g", "isX": false, "isMeal": false, "cal": 241.0, "carb": 62.6, "fat": 0.5, "protein": 3.4, "fibre": 7.3, "sugar": 53.4, "salt": 0.0}, {"name": "Dried Mango", "unit": "g", "isX": false, "isMeal": false, "cal": 319.0, "carb": 78.6, "fat": 1.2, "protein": 2.5, "fibre": 2.4, "sugar": 66.3, "salt": 0.0}, {"name": "Egg (one whole)", "unit": "g", "isX": false, "isMeal": false, "cal": 143.0, "carb": 1.1, "fat": 9.5, "protein": 12.6, "fibre": 0.0, "sugar": 1.1, "salt": 0.012}, {"name": "Green Beans", "unit": "g", "isX": false, "isMeal": false, "cal": 35.0, "carb": 7.9, "fat": 0.3, "protein": 1.9, "fibre": 3.4, "sugar": 1.4, "salt": 0.002}, {"name": "Hemp Seeds", "unit": "g", "isX": false, "isMeal": false, "cal": 553.0, "carb": 8.7, "fat": 48.8, "protein": 31.6, "fibre": 4.0, "sugar": 1.5, "salt": 0.0}, {"name": "Kale (raw)", "unit": "g", "isX": false, "isMeal": false, "cal": 48.9, "carb": 8.8, "fat": 0.9, "protein": 4.3, "fibre": 3.6, "sugar": 2.3, "salt": 0.038}, {"name": "Lentils", "unit": "g", "isX": false, "isMeal": false, "cal": 107.0, "carb": 14.2, "fat": 0.7, "protein": 8.5, "fibre": 4.7, "sugar": 0.5, "salt": 0.03}, {"name": "Lettuce", "unit": "g", "isX": false, "isMeal": false, "cal": 17.2, "carb": 3.3, "fat": 0.3, "protein": 1.3, "fibre": 22.0, "sugar": 1.2, "salt": 0.008}, {"name": "Maple Syrup", "unit": "g", "isX": false, "isMeal": false, "cal": 260.0, "carb": 67.0, "fat": 0.1, "protein": 0.0, "fibre": 0.0, "sugar": 60.0, "salt": 0.0}, {"name": "Meal: Cowboy Food (19/05)", "unit": "g", "isX": false, "isMeal": true, "cal": 75.472, "carb": 6.159, "fat": 3.159, "protein": 5.601, "fibre": 2.046, "sugar": 0.26, "salt": 0.3}, {"name": "Meal: Pork Chilli (21/05)", "unit": "g", "isX": false, "isMeal": true, "cal": 162.171, "carb": 8.132, "fat": 8.332, "protein": 12.863, "fibre": 3.076, "sugar": 1.095, "salt": 0.55}, {"name": "Meal: Pulled Chicken (20/05)", "unit": "g", "isX": false, "isMeal": true, "cal": 146.068, "carb": 0.321, "fat": 3.33, "protein": 28.704, "fibre": 0.052, "sugar": 0.308, "salt": 0.217}, {"name": "Melon", "unit": "g", "isX": false, "isMeal": false, "cal": 34.0, "carb": 7.8, "fat": 0.2, "protein": 0.8, "fibre": 0.9, "sugar": 7.8, "salt": 0.016}, {"name": "Milk", "unit": "ml", "isX": false, "isMeal": false, "cal": 47.0, "carb": 4.8, "fat": 1.6, "protein": 3.3, "fibre": 0.0, "sugar": 4.8, "salt": 0.01}, {"name": "Mixed Nuts (salted)", "unit": "g", "isX": false, "isMeal": false, "cal": 607.0, "carb": 21.3, "fat": 54.0, "protein": 20.0, "fibre": 7.0, "sugar": 4.0, "salt": 1.2}, {"name": "Oats (raw)", "unit": "g", "isX": false, "isMeal": false, "cal": 389.0, "carb": 66.3, "fat": 6.9, "protein": 16.9, "fibre": 10.6, "sugar": 1.0, "salt": 0.0}, {"name": "Olive Oil", "unit": "ml", "isX": false, "isMeal": false, "cal": 884.0, "carb": 0.0, "fat": 100.0, "protein": 0.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.0}, {"name": "Onions", "unit": "g", "isX": false, "isMeal": false, "cal": 44.0, "carb": 10.0, "fat": 0.2, "protein": 1.4, "fibre": 1.4, "sugar": 4.7, "salt": 0.003}, {"name": "Panchetta", "unit": "g", "isX": false, "isMeal": false, "cal": 217.778, "carb": 1.0, "fat": 14.074, "protein": 22.222, "fibre": 0, "sugar": 0, "salt": 0}, {"name": "Pasta White (dry)", "unit": "g", "isX": false, "isMeal": false, "cal": 371.0, "carb": 75.0, "fat": 1.5, "protein": 13.0, "fibre": 3.2, "sugar": 2.7, "salt": 0.006}, {"name": "Peanuts (salted)", "unit": "g", "isX": false, "isMeal": false, "cal": 567.0, "carb": 16.1, "fat": 49.2, "protein": 25.8, "fibre": 8.5, "sugar": 4.7, "salt": 1.0}, {"name": "Peas", "unit": "g", "isX": false, "isMeal": false, "cal": 84.0, "carb": 15.6, "fat": 0.2, "protein": 5.4, "fibre": 5.5, "sugar": 5.9, "salt": 0.003}, {"name": "Pinto Beans", "unit": "g", "isX": false, "isMeal": false, "cal": 88.0, "carb": 11.0, "fat": 0.7, "protein": 6.5, "fibre": 6.0, "sugar": 0.5, "salt": 0.091}, {"name": "Pork chops (lean)", "unit": "g", "isX": false, "isMeal": false, "cal": 231.0, "carb": 0.0, "fat": 13.9, "protein": 25.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.01}, {"name": "Pork Rojo\u0113s", "unit": "g", "isX": false, "isMeal": false, "cal": 242.0, "carb": 0.0, "fat": 14.0, "protein": 27.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.062}, {"name": "Potatoes (raw)", "unit": "g", "isX": false, "isMeal": false, "cal": 77.0, "carb": 17.4, "fat": 0.1, "protein": 2.1, "fibre": 2.1, "sugar": 0.8, "salt": 0.006}, {"name": "Pumpkin Seeds", "unit": "g", "isX": false, "isMeal": false, "cal": 559.0, "carb": 10.7, "fat": 49.0, "protein": 30.2, "fibre": 6.0, "sugar": 1.4, "salt": 0.0}, {"name": "Quinoa (mixed)", "unit": "g", "isX": false, "isMeal": false, "cal": 120.0, "carb": 21.3, "fat": 1.9, "protein": 4.1, "fibre": 2.8, "sugar": 0.9, "salt": 0.001}, {"name": "Rice White", "unit": "g", "isX": false, "isMeal": false, "cal": 130.0, "carb": 28.2, "fat": 0.3, "protein": 2.4, "fibre": 0.4, "sugar": 0.1, "salt": 0.001}, {"name": "Rocket", "unit": "g", "isX": false, "isMeal": false, "cal": 25.0, "carb": 3.7, "fat": 0.7, "protein": 2.6, "fibre": 1.6, "sugar": 2.1, "salt": 0.01}, {"name": "Shallots", "unit": "g", "isX": false, "isMeal": false, "cal": 73.0, "carb": 16.7, "fat": 0.1, "protein": 2.6, "fibre": 3.3, "sugar": 7.8, "salt": 0.012}, {"name": "Steak (lean)", "unit": "g", "isX": false, "isMeal": false, "cal": 217.0, "carb": 0.0, "fat": 12.8, "protein": 26.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.01}, {"name": "Tinned Tomatoes (Bio Chopped)", "unit": "g", "isX": false, "isMeal": false, "cal": 20.0, "carb": 3.0, "fat": 0.1, "protein": 1.3, "fibre": 1.1, "sugar": 3.0, "salt": 0.004}, {"name": "Tinned Tomatoes (Polpa)", "unit": "g", "isX": false, "isMeal": false, "cal": 26.0, "carb": 3.9, "fat": 3.9, "protein": 1.2, "fibre": 0, "sugar": 0, "salt": 0}, {"name": "Tomato (fresh)", "unit": "g", "isX": false, "isMeal": false, "cal": 18.0, "carb": 3.9, "fat": 0.2, "protein": 0.9, "fibre": 1.2, "sugar": 2.6, "salt": 0.005}, {"name": "Whey protein", "unit": "g", "isX": false, "isMeal": false, "cal": 370.0, "carb": 5.1, "fat": 3.3, "protein": 80.0, "fibre": 0.0, "sugar": 5.1, "salt": 0.035}, {"name": "Drinks: Bourbon", "unit": "ml", "isX": true, "isMeal": false, "cal": 232.8, "carb": 0.0, "fat": 0.0, "protein": 0.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.001}, {"name": "Drinks: Coke", "unit": "ml", "isX": true, "isMeal": false, "cal": 42.0, "carb": 10.6, "fat": 0.0, "protein": 0.0, "fibre": 0.0, "sugar": 10.6, "salt": 0.0}, {"name": "Drinks: Gin", "unit": "ml", "isX": true, "isMeal": false, "cal": 263.0, "carb": 0.0, "fat": 0.0, "protein": 0.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.002}, {"name": "Drinks: Jameson", "unit": "ml", "isX": true, "isMeal": false, "cal": 221.0, "carb": 0.0, "fat": 0.0, "protein": 0.0, "fibre": 0.0, "sugar": 0.0, "salt": 0.0}, {"name": "Drinks: Red wine", "unit": "ml", "isX": true, "isMeal": false, "cal": 85.0, "carb": 2.6, "fat": 0.0, "protein": 0.1, "fibre": 0.0, "sugar": 0.6, "salt": 0.004}, {"name": "Drinks: Whole Earth Ginger", "unit": "ml", "isX": true, "isMeal": false, "cal": 35.0, "carb": 8.2, "fat": 0.0, "protein": 0.0, "fibre": 0.0, "sugar": 8.2, "salt": 0.0}, {"name": "Drinks: Whole Earth Orange Lemon", "unit": "ml", "isX": true, "isMeal": false, "cal": 32.0, "carb": 8.0, "fat": 0.0, "protein": 0.0, "fibre": 0.0, "sugar": 8.0, "salt": 0.0}, {"name": "Drinks: Why Not Peach", "unit": "ml", "isX": true, "isMeal": false, "cal": 20.0, "carb": 4.6, "fat": 0.3, "protein": 0.4, "fibre": 0.0, "sugar": 4.5, "salt": 0.0}, {"name": "Drinks: Why Not Raspberry", "unit": "ml", "isX": true, "isMeal": false, "cal": 22.0, "carb": 5.1, "fat": 0.2, "protein": 0.3, "fibre": 0.0, "sugar": 4.3, "salt": 0.001}, {"name": "Yogurt (High Protein)", "unit": "g", "isX": false, "isMeal": false, "cal": 58.0, "carb": 3.9, "fat": 0.2, "protein": 10.0, "fibre": 0.0, "sugar": 3.9, "salt": 0.009}, {"name": "Honey", "unit": "tsp", "isX": false, "isMeal": false, "cal": 21, "carb": 5.7, "fat": 0, "protein": 0.02, "fibre": 0.01, "sugar": 5.7, "salt": 0.0003}, {"name": "Bread (White)", "unit": "g", "isX": false, "isMeal": false, "cal": 265.0, "carb": 49.0, "fat": 3.2, "protein": 9.0, "fibre": 2.7, "sugar": 5.0, "salt": 0.491}, {"name": "Shiitake mushrooms (raw)", "unit": "g", "isX": false, "isMeal": false, "cal": 34.0, "carb": 6.9, "fat": 0.5, "protein": 2.3, "fibre": 0.0, "sugar": 0.0, "salt": 0.009}, {"name": "Brown mushrooms (raw)", "unit": "g", "isX": false, "isMeal": false, "cal": 21.8, "carb": 4.3, "fat": 0.1, "protein": 2.5, "fibre": 0.6, "sugar": 1.7, "salt": 0.006}, {"name": "Meal: Boiled Mushrooms (26/05)", "unit": "g", "isX": false, "isMeal": true, "cal": 46.554, "carb": 8.278, "fat": 0.929, "protein": 4.037, "fibre": 1.026, "sugar": 2.069, "salt": 0.116}, {"name": "Fish fingers (3 units)", "unit": "g", "isX": false, "isMeal": false, "cal": 184.0, "carb": 18.0, "fat": 7.9, "protein": 9.9, "fibre": 0.8, "sugar": 0.9, "salt": 0.67}, {"name": "Meal: Pulled Chicken (26/05)", "unit": "g", "isX": false, "isMeal": true, "cal": 166.623, "carb": 0.219, "fat": 3.788, "protein": 30.904, "fibre": 0.175, "sugar": 0.175, "salt": 0.114}, {"name": "Meal: Chicken Curry 6 PORTIONS (27/05)", "unit": "g", "isX": false, "isMeal": true, "cal": 143.761, "carb": 4.068, "fat": 7.494, "protein": 16.096, "fibre": 0.629, "sugar": 1.857, "salt": 0.0}, {"name": "Strawberries (frozen)", "unit": "g", "isX": false, "isMeal": false, "cal": 31.0, "carb": 5.3, "fat": 0.4, "protein": 0.6, "fibre": 2.0, "sugar": 5.3, "salt": 0.0}, {"name": "Kidney beans", "unit": "g", "isX": false, "isMeal": false, "cal": 98.0, "carb": 13.0, "fat": 0.6, "protein": 7.6, "fibre": 5.5, "sugar": 0.5, "salt": 0.86}, {"name": "Peppers (Bell)", "unit": "g", "isX": false, "isMeal": false, "cal": 28.0, "carb": 6.6, "fat": 0.2, "protein": 1.0, "fibre": 1.1, "sugar": 2.5, "salt": 0.002}, {"name": "Peppers (Italian Long)", "unit": "g", "isX": false, "isMeal": false, "cal": 42.0, "carb": 9.2, "fat": 0.5, "protein": 1.9, "fibre": 1.6, "sugar": 5.5, "salt": 0.009}, {"name": "Carrot (raw)", "unit": "g", "isX": false, "isMeal": false, "cal": 41.0, "carb": 9.6, "fat": 0.2, "protein": 0.9, "fibre": 2.8, "sugar": 4.7, "salt": 0.069}, {"name": "Cottage cheese", "unit": "g", "isX": false, "isMeal": false, "cal": 103.0, "carb": 3.8, "fat": 4.0, "protein": 13.0, "fibre": 0.0, "sugar": 3.8, "salt": 0.8}, {"name": "Parmesan cheese", "unit": "g", "isX": false, "isMeal": false, "cal": 402.0, "carb": 0.0, "fat": 30.0, "protein": 32.0, "fibre": 0.0, "sugar": 0.0, "salt": 1.6}, {"name": "Sundried tomatoes", "unit": "g", "isX": false, "isMeal": false, "cal": 125.0, "carb": 7.7, "fat": 8.2, "protein": 2.2, "fibre": 6.0, "sugar": 5.7, "salt": 1.9}, {"name": "Spinach", "unit": "g", "isX": false, "isMeal": false, "cal": 19.0, "carb": 0.8, "fat": 0.5, "protein": 1.8, "fibre": 2.0, "sugar": 0.3, "salt": 0.15}, {"name": "Meal: Marry Me Chicken (02/06)", "unit": "g", "isX": false, "isMeal": true, "cal": 148.276, "carb": 15.979, "fat": 3.096, "protein": 13.289, "fibre": 1.083, "sugar": 1.598, "salt": 0.31}];
+
+// ---------- default state ----------
+const RANGE_TABLE = {
+  sedentary:{lose:[10,12],maintain:[12,14],gain:[14,16]},
+  moderate:{lose:[12,14],maintain:[14,16],gain:[16,18]},
+  high:{lose:[14,16],maintain:[16,18],gain:[18,20]}
+};
+
+const DEFAULT_CONFIG = {
+  people: [
+    {id:'p1', name:'NJ', weightKg:70, activity:'moderate', goal:'lose', rangePoint:0},
+    {id:'p2', name:'MB', weightKg:70, activity:'moderate', goal:'lose', rangePoint:0}
+  ],
+  macroSplit: {protein:30, carb:45, fat:25}, // %
+  mealSplit: {breakfast:20, lunch:35, dinner:45} // %
+};
+
+let STATE = {
+  config: null,
+  foods: {}, // id -> food object
+  logs: {},  // dateStr -> [entries]
+  tab: 'log',
+  currentDate: todayStr()
+};
+
+// ---------- config math ----------
+function calRangeFor(person){
+  const lb = person.weightKg * 2.20462;
+  const [lo,hi] = RANGE_TABLE[person.activity][person.goal];
+  const low = lb*lo, high = lb*hi;
+  const pt = clamp(person.rangePoint,0,100)/100;
+  const chosen = low + (high-low)*pt;
+  return {low, high, chosen};
+}
+function personTargets(person, cfg){
+  const {chosen} = calRangeFor(person);
+  const cal = chosen;
+  const protein = (cal * cfg.macroSplit.protein/100)/4;
+  const carb = (cal * cfg.macroSplit.carb/100)/4;
+  const fat = (cal * cfg.macroSplit.fat/100)/9;
+  return {cal, protein, carb, fat};
+}
+function mealTargets(person, cfg){
+  const day = personTargets(person, cfg);
+  const out = {};
+  ['breakfast','lunch','dinner'].forEach(m=>{
+    const pct = cfg.mealSplit[m]/100;
+    out[m] = {cal:day.cal*pct, protein:day.protein*pct, carb:day.carb*pct, fat:day.fat*pct};
+  });
+  return {day, meals:out};
+}
+function suggestedSplit(cfg){
+  const t = cfg.people.map(p=>personTargets(p,cfg).cal);
+  const total = t[0]+t[1];
+  if(total<=0) return [50,50];
+  return [Math.round(t[0]/total*100), Math.round(t[1]/total*100)];
+}
+
+// ---------- food math ----------
+function unitBasis(unit){ return (unit==='g'||unit==='ml') ? 100 : 1; }
+function unitLabel(unit){
+  if(unit==='g') return '100g';
+  if(unit==='ml') return '100ml';
+  if(unit==='tsp') return '1 tsp';
+  if(unit==='tbsp') return '1 tbsp';
+  return unit;
+}
+function scaleFood(food, amount){
+  const f = amount/unitBasis(food.unit);
+  const out = {};
+  NUTS.forEach(n=> out[n] = (food[n]||0)*f);
+  return out;
+}
+function pRatio(food){
+  const denom = (food.protein||0)+(food.carb||0)+(food.fat||0);
+  if(denom<=0) return 0;
+  return (food.protein||0)/denom;
+}
+function pRatioPill(food){
+  const r = pRatio(food);
+  const pct = Math.round(r*100);
+  let cls = 'low';
+  if(r>0.6) cls='high'; else if(r>=0.3) cls='med';
+  return `<span class="pill ${cls}">P ${pct}%</span>`;
+}
+
+// ---------- render root ----------
+async function loadAll(){
+  try{
+    let cfg = await getConfig();
+    if(!cfg || !cfg.people){
+      cfg = DEFAULT_CONFIG;
+      await saveConfigToDb(cfg);
+    }
+    STATE.config = cfg;
+
+    STATE.foods = await getFoods();
+    if(Object.keys(STATE.foods).length === 0 && SEED_FOODS.length){
+      const list = SEED_FOODS.map(f=>{
+        const id = uid();
+        const food = {id, ...f};
+        STATE.foods[id] = food;
+        return food;
+      });
+      await upsertFoods(list);
+      toast('Imported ' + SEED_FOODS.length + ' items from your spreadsheet');
+    }
+
+    STATE.logs = await getAllLogs();
+    render();
+  }catch(e){
+    console.error(e);
+    document.getElementById('app').innerHTML = '<div class="panel"><b>Could not load data from Supabase.</b><p class="small">Check your connection or Supabase project status, then reload.</p></div>';
+  }
+}
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <header>
+      <h1>Shredder</h1>
+      <div class="tag">Shared &middot; ${STATE.config.people.map(p=>p.name).join(' + ')}</div>
+    </header>
+    <nav>
+      ${tabBtn('log','Plan &amp; Log')}
+      ${tabBtn('today','Today')}
+      ${tabBtn('week','Week')}
+      ${tabBtn('build','Batch Cook')}
+      ${tabBtn('config','Config')}
+      ${tabBtn('foods','Master List')}
+      ${tabBtn('data','Data')}
+    </nav>
+    <div id="tabroot"></div>
+  `;
+  const root = document.getElementById('tabroot');
+  if(STATE.tab==='config') renderConfig(root);
+  else if(STATE.tab==='foods') renderFoods(root);
+  else if(STATE.tab==='build') renderBuild(root);
+  else if(STATE.tab==='log') renderLog(root);
+  else if(STATE.tab==='today') renderToday(root);
+  else if(STATE.tab==='week') renderWeek(root);
+  else if(STATE.tab==='data') renderData(root);
+}
+function tabBtn(id,label){
+  return `<button class="${STATE.tab===id?'active':''}" onclick="setTab('${id}')">${label}</button>`;
+}
+function setTab(id){ STATE.tab=id; render(); }
+
+// ============================================================
+// CONFIG TAB
+// ============================================================
+function renderConfig(root){
+  const cfg = STATE.config;
+  const split = suggestedSplit(cfg);
+  root.innerHTML = `
+    <div class="panel">
+      <div class="section-title">Per person</div>
+      <div class="grid2">
+        ${cfg.people.map((p,i)=>renderPersonConfig(p,i)).join('')}
+      </div>
+
+      <div class="section-title">Macro split (applied to both, % of calories)</div>
+      <div class="row">
+        <div><label>Protein %</label><input type="number" id="ms-protein" value="${cfg.macroSplit.protein}" oninput="checkSplitSums()"></div>
+        <div><label>Carb %</label><input type="number" id="ms-carb" value="${cfg.macroSplit.carb}" oninput="checkSplitSums()"></div>
+        <div><label>Fat %</label><input type="number" id="ms-fat" value="${cfg.macroSplit.fat}" oninput="checkSplitSums()"></div>
+      </div>
+      <div class="small" id="macro-sum-warn"></div>
+
+      <div class="section-title">Meal split (% of each person's daily target)</div>
+      <div class="row">
+        <div><label>Breakfast %</label><input type="number" id="sp-breakfast" value="${cfg.mealSplit.breakfast}" oninput="checkSplitSums()"></div>
+        <div><label>Lunch %</label><input type="number" id="sp-lunch" value="${cfg.mealSplit.lunch}" oninput="checkSplitSums()"></div>
+        <div><label>Dinner %</label><input type="number" id="sp-dinner" value="${cfg.mealSplit.dinner}" oninput="checkSplitSums()"></div>
+      </div>
+      <div class="small" id="meal-sum-warn"></div>
+
+      <div class="row" style="margin-top:14px;">
+        <button class="btn" id="save-config-btn" onclick="saveConfig()">Save config</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">Output — daily &amp; per-meal targets</div>
+      <div class="grid2">
+        ${cfg.people.map(p=>renderTargetsOutput(p,cfg)).join('')}
+      </div>
+
+      <div class="section-title">Shared-meal split suggestion</div>
+      <p class="small">Based on the ratio of each person's daily calorie target. Use this as the default weight split when logging a shared meal — override any time per entry.</p>
+      <div class="row">
+        <div><b class="mono">${cfg.people[0].name}: ${split[0]}%</b></div>
+        <div><b class="mono">${cfg.people[1].name}: ${split[1]}%</b></div>
+      </div>
+    </div>
+  `;
+  checkSplitSums();
+}
+function renderPersonConfig(p,i){
+  const r = calRangeFor(p);
+  return `
+    <div class="person-card">
+      <h3>${p.name}</h3>
+      <div class="row">
+        <div><label>Weight (kg)</label><input type="number" id="p${i}-weight" value="${p.weightKg}" oninput="livePersonRange(${i})"></div>
+        <div>
+          <label>Goal</label>
+          <select id="p${i}-goal" onchange="livePersonRange(${i})">
+            <option value="lose" ${p.goal==='lose'?'selected':''}>Lose</option>
+            <option value="maintain" ${p.goal==='maintain'?'selected':''}>Maintain</option>
+            <option value="gain" ${p.goal==='gain'?'selected':''}>Gain</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Activity level</label>
+          <select id="p${i}-activity" onchange="livePersonRange(${i})">
+            <option value="sedentary" ${p.activity==='sedentary'?'selected':''}>Sedentary</option>
+            <option value="moderate" ${p.activity==='moderate'?'selected':''}>Moderate (3-4x/wk)</option>
+            <option value="high" ${p.activity==='high'?'selected':''}>High (5-7x/wk)</option>
+          </select>
+        </div>
+        <div><label>Fibre target (g/day)</label><input type="number" id="p${i}-fibre" value="${p.fibreTarget||''}"></div>
+      </div>
+      <label id="p${i}-rangeline">Point on range: ${round0(r.low)} — ${round0(r.high)} cal &middot; chosen <b class="mono">${round0(r.chosen)}</b></label>
+      <input type="range" min="0" max="100" id="p${i}-point" value="${p.rangePoint}" oninput="livePersonRange(${i})">
+      <div class="small" style="text-align:right;" id="p${i}-pointval">${p.rangePoint}%</div>
+    </div>
+  `;
+}
+function livePersonRange(i){
+  const weightKg = parseFloat(document.getElementById(`p${i}-weight`).value)||0;
+  const goal = document.getElementById(`p${i}-goal`).value;
+  const activity = document.getElementById(`p${i}-activity`).value;
+  const rangePoint = clamp(parseFloat(document.getElementById(`p${i}-point`).value)||0, 0, 100);
+  const lb = weightKg * 2.20462;
+  const [lo,hi] = RANGE_TABLE[activity][goal];
+  const low = lb*lo, high = lb*hi;
+  const chosen = low + (high-low)*(rangePoint/100);
+  document.getElementById(`p${i}-rangeline`).innerHTML = `Point on range: ${round0(low)} — ${round0(high)} cal &middot; chosen <b class="mono">${round0(chosen)}</b>`;
+  document.getElementById(`p${i}-pointval`).textContent = rangePoint+'%';
+}
+function renderTargetsOutput(p,cfg){
+  const mt = mealTargets(p,cfg);
+  return `
+    <div class="person-card">
+      <h3>${p.name}</h3>
+      <div class="table-scroll"><table>
+        <tr><th></th><th>Cal</th><th>Protein g</th><th>Carb g</th><th>Fat g</th><th>Fibre g</th></tr>
+        <tr><td class="mono">Daily</td><td class="mono">${round0(mt.day.cal)}</td><td class="mono">${round0(mt.day.protein)}</td><td class="mono">${round0(mt.day.carb)}</td><td class="mono">${round0(mt.day.fat)}</td><td class="mono">${p.fibreTarget?round0(p.fibreTarget):'—'}</td></tr>
+        <tr><td class="mono">Breakfast</td><td class="mono">${round0(mt.meals.breakfast.cal)}</td><td class="mono">${round0(mt.meals.breakfast.protein)}</td><td class="mono">${round0(mt.meals.breakfast.carb)}</td><td class="mono">${round0(mt.meals.breakfast.fat)}</td><td>—</td></tr>
+        <tr><td class="mono">Lunch</td><td class="mono">${round0(mt.meals.lunch.cal)}</td><td class="mono">${round0(mt.meals.lunch.protein)}</td><td class="mono">${round0(mt.meals.lunch.carb)}</td><td class="mono">${round0(mt.meals.lunch.fat)}</td><td>—</td></tr>
+        <tr><td class="mono">Dinner</td><td class="mono">${round0(mt.meals.dinner.cal)}</td><td class="mono">${round0(mt.meals.dinner.protein)}</td><td class="mono">${round0(mt.meals.dinner.carb)}</td><td class="mono">${round0(mt.meals.dinner.fat)}</td><td>—</td></tr>
+      </table></div>
+    </div>
+  `;
+}
+function checkSplitSums(){
+  const macroSum = (parseFloat(document.getElementById('ms-protein').value)||0) + (parseFloat(document.getElementById('ms-carb').value)||0) + (parseFloat(document.getElementById('ms-fat').value)||0);
+  const mealSum = (parseFloat(document.getElementById('sp-breakfast').value)||0) + (parseFloat(document.getElementById('sp-lunch').value)||0) + (parseFloat(document.getElementById('sp-dinner').value)||0);
+  const macroOk = Math.abs(macroSum-100)<0.5;
+  const mealOk = Math.abs(mealSum-100)<0.5;
+  document.getElementById('macro-sum-warn').innerHTML = macroOk
+    ? `<span style="color:var(--good);">Sums to ${round0(macroSum)}%</span>`
+    : `<span style="color:var(--bad);">Sums to ${round0(macroSum)}% — must total 100%</span>`;
+  document.getElementById('meal-sum-warn').innerHTML = mealOk
+    ? `<span style="color:var(--good);">Sums to ${round0(mealSum)}%</span>`
+    : `<span style="color:var(--bad);">Sums to ${round0(mealSum)}% — must total 100%</span>`;
+  document.getElementById('save-config-btn').disabled = !(macroOk && mealOk);
+  return macroOk && mealOk;
+}
+async function saveConfig(){
+  if(!checkSplitSums()){ toast('Fix split percentages first — each group must total 100%'); return; }
+  const cfg = STATE.config;
+  cfg.people.forEach((p,i)=>{
+    p.weightKg = parseFloat(document.getElementById(`p${i}-weight`).value)||p.weightKg;
+    p.activity = document.getElementById(`p${i}-activity`).value;
+    p.goal = document.getElementById(`p${i}-goal`).value;
+    p.rangePoint = parseFloat(document.getElementById(`p${i}-point`).value)||0;
+    p.fibreTarget = parseFloat(document.getElementById(`p${i}-fibre`).value)||0;
+  });
+  cfg.macroSplit = {
+    protein: parseFloat(document.getElementById('ms-protein').value)||0,
+    carb: parseFloat(document.getElementById('ms-carb').value)||0,
+    fat: parseFloat(document.getElementById('ms-fat').value)||0,
+  };
+  cfg.mealSplit = {
+    breakfast: parseFloat(document.getElementById('sp-breakfast').value)||0,
+    lunch: parseFloat(document.getElementById('sp-lunch').value)||0,
+    dinner: parseFloat(document.getElementById('sp-dinner').value)||0,
+  };
+  try{
+    await saveConfigToDb(cfg);
+    toast('Config saved');
+  }catch(e){
+    console.error(e);
+    toast('Could not save config — check connection');
+  }
+  render();
+}
+
+// ============================================================
+// MASTER LIST TAB
+// ============================================================
+let foodSearchTerm = '';
+function renderFoods(root){
+  const foods = Object.values(STATE.foods);
+  const filtered = foods.filter(f=>f.name.toLowerCase().includes(foodSearchTerm.toLowerCase()));
+  filtered.sort((a,b)=>{
+    if(!!a.isX !== !!b.isX) return a.isX? 1: -1;
+    return a.name.localeCompare(b.name);
+  });
+  root.innerHTML = `
+    <div class="panel">
+      <div class="flex-between">
+        <div class="section-title" style="border:none;margin:0;">Add an ingredient</div>
+      </div>
+      <div class="row">
+        <div style="flex:2;"><label>Name</label><input id="nf-name" placeholder="e.g. Chicken breast (raw)"></div>
+        <div><label>Per</label>
+          <select id="nf-unit" onchange="document.getElementById('nf-basis').textContent=unitLabel(this.value)">
+            <option value="g">100 g</option><option value="ml">100 ml</option>
+            <option value="tsp">1 tsp</option><option value="tbsp">1 tbsp</option>
+          </select>
+        </div>
+        <div><label style="cursor:pointer;"><input type="checkbox" id="nf-x" style="width:auto;"> Flag as X (treat)</label></div>
+      </div>
+      <p class="small">Values below are per <b id="nf-basis">100g</b> (or whatever you picked above).</p>
+      <div class="row">
+        <div><label>Cal</label><input type="number" id="nf-cal"></div>
+        <div><label>Protein g</label><input type="number" id="nf-protein"></div>
+        <div><label>Carb g</label><input type="number" id="nf-carb"></div>
+        <div><label>Fat g</label><input type="number" id="nf-fat"></div>
+        <div><label>Fibre g</label><input type="number" id="nf-fibre"></div>
+        <div><label>Sugar g</label><input type="number" id="nf-sugar"></div>
+        <div><label>Salt g</label><input type="number" id="nf-salt"></div>
+      </div>
+      <button class="btn" onclick="addFood()">Add to master list</button>
+    </div>
+
+    <div class="panel">
+      <div class="flex-between">
+        <div class="section-title" style="border:none;margin:0;">Master list (${filtered.length})</div>
+        <input id="food-search" style="max-width:220px;" placeholder="Search..." value="${foodSearchTerm}" oninput="foodSearchTerm=this.value;safeRerender(renderFoods)">
+      </div>
+      <p class="small">P ratio = protein ÷ (protein+carb+fat). <span class="pill high">High &gt;60%</span> mostly protein — safe pick when your gap is protein but carb/fat is tight. <span class="pill med">Med 30–60%</span> — decent protein with carb/fat headroom to spare. <span class="pill low">Low &lt;30%</span> — carb/fat dominant. X-flagged items sort last.</p>
+      <div class="table-scroll"><table>
+        <tr><th>Name</th><th>Per</th><th>Cal</th><th>Protein</th><th>Carb</th><th>Fat</th><th>Fibre</th><th>Sugar</th><th>Salt</th><th></th><th></th></tr>
+        ${filtered.map(f=>`
+          <tr class="${f.isX?'x-row':''}">
+            <td>${f.isX?'<span class="pill x">X</span> ':''}${f.name}${f.isMeal?' <span class="small">(meal)</span>':''}</td>
+            <td class="mono small">${unitLabel(f.unit)}</td>
+            <td class="mono">${round0(f.cal)}</td>
+            <td class="mono">${round1(f.protein)}</td>
+            <td class="mono">${round1(f.carb)}</td>
+            <td class="mono">${round1(f.fat)}</td>
+            <td class="mono">${round1(f.fibre)}</td>
+            <td class="mono">${round1(f.sugar)}</td>
+            <td class="mono">${round1(f.salt)}</td>
+            <td>${pRatioPill(f)}</td>
+            <td><button class="btn danger" style="padding:3px 8px;" onclick="deleteFood('${f.id}')">×</button></td>
+          </tr>
+        `).join('') || '<tr><td colspan="11" class="empty">No foods yet — add one above.</td></tr>'}
+      </table></div>
+    </div>
+  `;
+}
+async function addFood(){
+  const name = document.getElementById('nf-name').value.trim();
+  if(!name){ toast('Name it first'); return; }
+  const food = {
+    id: uid(), name,
+    unit: document.getElementById('nf-unit').value,
+    isX: document.getElementById('nf-x').checked,
+    isMeal:false,
+    cal: parseFloat(document.getElementById('nf-cal').value)||0,
+    protein: parseFloat(document.getElementById('nf-protein').value)||0,
+    carb: parseFloat(document.getElementById('nf-carb').value)||0,
+    fat: parseFloat(document.getElementById('nf-fat').value)||0,
+    fibre: parseFloat(document.getElementById('nf-fibre').value)||0,
+    sugar: parseFloat(document.getElementById('nf-sugar').value)||0,
+    salt: parseFloat(document.getElementById('nf-salt').value)||0,
+  };
+  STATE.foods[food.id] = food;
+  try{
+    await upsertFood(food);
+    toast('Added to master list');
+  }catch(e){
+    console.error(e);
+    toast('Could not save — check connection');
+  }
+  renderFoods(document.getElementById('tabroot'));
+}
+async function deleteFood(id){
+  delete STATE.foods[id];
+  try{
+    await deleteFoodDb(id);
+  }catch(e){
+    console.error(e);
+    toast('Could not delete — check connection');
+  }
+  renderFoods(document.getElementById('tabroot'));
+}
+
+// ============================================================
+// BUILD A MEAL TAB
+// ============================================================
+let buildLines = [{foodId:'', grams:0}];
+let buildCookedWeight = '';
+function renderBuild(root){
+  const foods = Object.values(STATE.foods).filter(f=>!f.isMeal).sort((a,b)=>a.name.localeCompare(b.name));
+  const totals = computeBuildTotals();
+  const cookedNum = parseFloat(buildCookedWeight)||0;
+  root.innerHTML = `
+    <div class="panel">
+      <div class="section-title">Batch meal builder</div>
+      <div class="row">
+        <div style="flex:2;"><label>Meal name</label><input id="bm-name" placeholder="e.g. Marry Me Chicken"></div>
+        <div><label>Batch date</label><input type="date" id="bm-date" value="${todayStr()}"></div>
+      </div>
+      <div id="build-lines">
+        ${buildLines.map((l,i)=>`
+          <div class="ing-row">
+            <div class="ing-food">
+              <select onchange="buildLines[${i}].foodId=this.value; renderBuild(document.getElementById('tabroot'))">
+                <option value="">— pick ingredient —</option>
+                ${foods.map(f=>`<option value="${f.id}" ${l.foodId===f.id?'selected':''}>${f.name} — ${unitLabel(f.unit)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="ing-amount"><input id="build-grams-${i}" type="text" inputmode="decimal" placeholder="amount" value="${l.grams||''}" oninput="buildLines[${i}].grams=parseFloat(this.value)||0; safeRerender(renderBuild)"></div>
+            <div class="ing-del"><button class="btn danger" style="padding:6px 10px;" onclick="buildLines.splice(${i},1); renderBuild(document.getElementById('tabroot'))">×</button></div>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn secondary" onclick="buildLines.push({foodId:'',grams:0}); renderBuild(document.getElementById('tabroot'))">+ Add ingredient line</button>
+
+      <div class="section-title">Batch totals (raw ingredients — nutrients don't change on cooking)</div>
+      <div class="table-scroll"><table>
+        <tr>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}<th>Raw g in</th></tr>
+        <tr>${NUTS.map(n=>`<td class="mono">${round1(totals[n])}</td>`).join('')}<td class="mono">${round0(totals.grams)}</td></tr>
+      </table></div>
+
+      <div class="section-title">Finished (cooked) weight</div>
+      <p class="small">Weigh the pan/pot once cooked (water you added doesn't need to be tracked — it's already reflected here since you're entering the actual finished weight). Leave blank to save per raw grams instead.</p>
+      <div class="row">
+        <div><label>Cooked weight (g)</label><input type="text" inputmode="decimal" id="bm-cooked" placeholder="e.g. 750" value="${buildCookedWeight}" oninput="buildCookedWeight=this.value; safeRerender(renderBuild)"></div>
+      </div>
+      ${cookedNum>0 ? `
+        <p class="small">This will save as <b class="mono">per 100g of the finished ${round0(cookedNum)}g batch</b>:</p>
+        <div class="table-scroll"><table>
+          <tr>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}</tr>
+          <tr>${NUTS.map(n=>`<td class="mono">${round1(totals[n]/cookedNum*100)}</td>`).join('')}</tr>
+        </table></div>
+      ` : ''}
+      <p class="small">Saved as per-100g values, same as any ingredient — so you can log leftovers by grams eaten.</p>
+      <button class="btn" onclick="saveMeal()">Save meal to master list</button>
+    </div>
+  `;
+}
+function computeBuildTotals(){
+  const totals = {grams:0}; NUTS.forEach(n=>totals[n]=0);
+  buildLines.forEach(l=>{
+    const f = STATE.foods[l.foodId];
+    if(!f || !l.grams) return;
+    const s = scaleFood(f, l.grams);
+    NUTS.forEach(n=> totals[n]+=s[n]);
+    totals.grams += l.grams;
+  });
+  return totals;
+}
+async function saveMeal(){
+  const name = document.getElementById('bm-name').value.trim();
+  if(!name){ toast('Name the meal first'); return; }
+  const date = document.getElementById('bm-date').value || todayStr();
+  const totals = computeBuildTotals();
+  if(totals.grams<=0){ toast('Add ingredients with grams first'); return; }
+  const cookedNum = parseFloat(buildCookedWeight)||0;
+  const finalWeight = cookedNum>0 ? cookedNum : totals.grams;
+  const per100 = {};
+  NUTS.forEach(n=> per100[n] = totals[n]/finalWeight*100);
+  const meal = {
+    id: uid(), name: `Meal: ${name} (${date})`, unit:'g', isMeal:true, isX:false,
+    batchDate: date, batchWeight: finalWeight, rawWeight: totals.grams,
+    ...per100
+  };
+  STATE.foods[meal.id] = meal;
+  try{
+    await upsertFood(meal);
+    toast(cookedNum>0 ? `Meal saved — per 100g of ${round0(cookedNum)}g cooked weight` : 'Meal saved to master list');
+  }catch(e){
+    console.error(e);
+    toast('Could not save — check connection');
+  }
+  buildLines = [{foodId:'', grams:0}];
+  buildCookedWeight = '';
+  renderBuild(document.getElementById('tabroot'));
+}
+
+// ============================================================
+// LOG TAB — plan a plate together, commit once
+// ============================================================
+let plateDate = todayStr();
+let plateSlot = 'breakfast';
+let plateLines = [{foodId:'', grams:0, assign:'shared'}];
+let plateSplitPct = null; // % to person 0
+
+function renderLog(root){
+  const cfg = STATE.config;
+  if(plateSplitPct===null){ plateSplitPct = suggestedSplit(cfg)[0]; }
+  const foods = Object.values(STATE.foods).sort((a,b)=>{
+    if(!!a.isX !== !!b.isX) return a.isX?1:-1;
+    return a.name.localeCompare(b.name);
+  });
+  const totals = computeLinesTotals(plateLines);
+  const already = alreadyLoggedFor(plateDate, plateSlot);
+  const p1 = cfg.people[0], p2 = cfg.people[1];
+
+  root.innerHTML = `
+    <div class="panel">
+      <div class="row">
+        <div><label>Date</label><input type="date" id="pl-date" value="${plateDate}" onchange="plateDate=this.value; renderLog(document.getElementById('tabroot'))"></div>
+        <div><label>Meal</label>
+          <select id="pl-slot" onchange="plateSlot=this.value; renderLog(document.getElementById('tabroot'))">
+            <option value="breakfast" ${plateSlot==='breakfast'?'selected':''}>Breakfast</option>
+            <option value="lunch" ${plateSlot==='lunch'?'selected':''}>Lunch</option>
+            <option value="dinner" ${plateSlot==='dinner'?'selected':''}>Dinner</option>
+          </select>
+        </div>
+        <div style="flex:2;min-width:220px;">
+          <label>Split this plate</label>
+          <div class="flex-between" style="margin-bottom:2px;">
+            <span class="mono small">${p1.name} ${plateSplitPct}%</span>
+            <span class="mono small">${p2.name} ${100-plateSplitPct}%</span>
+          </div>
+          <input type="range" min="0" max="100" id="pl-split" value="${plateSplitPct}" oninput="plateSplitPct=parseInt(this.value); safeRerender(renderLog)">
+        </div>
+      </div>
+
+      <div class="section-title">Plan the plate</div>
+      <div id="plate-lines">
+        ${plateLines.map((l,i)=>`
+          <div class="ing-row">
+            <div class="ing-food">
+              <select onchange="plateLines[${i}].foodId=this.value; renderLog(document.getElementById('tabroot'))">
+                <option value="">— pick ingredient or meal —</option>
+                ${foods.map(f=>`<option value="${f.id}" ${l.foodId===f.id?'selected':''}>${f.isX?'⚑ ':''}${f.name} — ${unitLabel(f.unit)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="ing-amount"><input id="plate-grams-${i}" type="text" inputmode="decimal" placeholder="amount" value="${l.grams||''}" oninput="plateLines[${i}].grams=parseFloat(this.value)||0; safeRerender(renderLog)"></div>
+            <div class="ing-assign">
+              <select onchange="plateLines[${i}].assign=this.value; renderLog(document.getElementById('tabroot'))">
+                <option value="shared" ${l.assign==='shared'?'selected':''}>Both (split)</option>
+                <option value="${p1.id}" ${l.assign===p1.id?'selected':''}>${p1.name} only</option>
+                <option value="${p2.id}" ${l.assign===p2.id?'selected':''}>${p2.name} only</option>
+              </select>
+            </div>
+            <div class="ing-del"><button class="btn danger" style="padding:6px 10px;" onclick="plateLines.splice(${i},1); renderLog(document.getElementById('tabroot'))">×</button></div>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn secondary" onclick="plateLines.push({foodId:'',grams:0,assign:'shared'}); renderLog(document.getElementById('tabroot'))">+ Add ingredient</button>
+
+      <div class="section-title">This plate — totals</div>
+      <div class="table-scroll"><table>
+        <tr>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}<th>Grams</th></tr>
+        <tr>${NUTS.map(n=>`<td class="mono">${round1(totals[n])}</td>`).join('')}<td class="mono">${round0(totals.grams)}</td></tr>
+      </table></div>
+
+      <div class="section-title">vs targets — ${plateSlot}, ${plateDate}</div>
+      <div class="grid2">
+        ${cfg.people.map(p=>renderPlatePersonCompare(p,cfg,plateLines,plateSplitPct,already)).join('')}
+      </div>
+
+      <button class="btn" style="margin-top:14px;" onclick="commitPlate()">Commit to log</button>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">${plateDate} — remaining for the day</div>
+      <div class="grid2">
+        ${cfg.people.map(p=>renderDayRemaining(p,cfg,plateDate)).join('')}
+      </div>
+      <div class="section-title">${plateDate} — logged so far</div>
+      <div class="daylist">
+        ${['breakfast','lunch','dinner'].map(slot=>renderLogSlot(slot, STATE.logs[plateDate]||[])).join('')}
+      </div>
+    </div>
+  `;
+}
+function renderDayRemaining(person, cfg, date){
+  const entries = (STATE.logs[date]||[]).filter(e=>e.person===person.id);
+  const consumed = {cal:0,protein:0,carb:0,fat:0};
+  entries.forEach(e=>{ consumed.cal+=e.cal; consumed.protein+=e.protein; consumed.carb+=e.carb; consumed.fat+=e.fat; });
+  const target = mealTargets(person, cfg).day;
+  const remaining = {
+    cal: target.cal-consumed.cal, protein: target.protein-consumed.protein,
+    carb: target.carb-consumed.carb, fat: target.fat-consumed.fat
+  };
+  const pct = clamp(consumed.cal/Math.max(target.cal,1)*100,0,140);
+  return `
+    <div class="person-card">
+      <h3>${person.name}</h3>
+      <div class="stat"><span>Cal</span><b>${round0(consumed.cal)} / ${round0(target.cal)} &middot; ${remaining.cal>=0?'+':''}${round0(remaining.cal)} left</b></div>
+      <div class="bar-wrap"><div class="bar ${pct>100?'over':''}" style="width:${Math.min(pct,100)}%;"></div></div>
+      <div class="stat"><span>P / C / F left</span><b>${round0(remaining.protein)} / ${round0(remaining.carb)} / ${round0(remaining.fat)}</b></div>
+    </div>
+  `;
+}
+function computeLinesTotals(lines){
+  const totals = {grams:0}; NUTS.forEach(n=>totals[n]=0);
+  lines.forEach(l=>{
+    const f = STATE.foods[l.foodId];
+    if(!f || !l.grams) return;
+    const s = scaleFood(f, l.grams);
+    NUTS.forEach(n=> totals[n]+=s[n]);
+    totals.grams += l.grams;
+  });
+  return totals;
+}
+function alreadyLoggedFor(date, slot){
+  const entries = (STATE.logs[date]||[]).filter(e=>e.slot===slot);
+  const out = {};
+  STATE.config.people.forEach(p=>{
+    const mine = entries.filter(e=>e.person===p.id);
+    const sums = {cal:0,protein:0,carb:0,fat:0};
+    mine.forEach(e=>{ sums.cal+=e.cal; sums.protein+=e.protein; sums.carb+=e.carb; sums.fat+=e.fat; });
+    out[p.id] = sums;
+  });
+  return out;
+}
+function personLineShare(person, personIdx, line, splitPct){
+  const f = STATE.foods[line.foodId];
+  if(!f || !line.grams) return {cal:0,protein:0,carb:0,fat:0,grams:0};
+  if(line.assign==='shared'){
+    const pct = personIdx===0 ? splitPct : (100-splitPct);
+    const grams = line.grams*pct/100;
+    return {...scaleFood(f,grams), grams};
+  } else if(line.assign===person.id){
+    return {...scaleFood(f,line.grams), grams:line.grams};
+  }
+  return {cal:0,protein:0,carb:0,fat:0,grams:0};
+}
+function renderPlatePersonCompare(person, cfg, lines, splitPct, already){
+  const idx = cfg.people.findIndex(p=>p.id===person.id);
+  const plate = {cal:0,protein:0,carb:0,fat:0};
+  lines.forEach(l=>{
+    const s = personLineShare(person, idx, l, splitPct);
+    plate.cal+=s.cal; plate.protein+=s.protein; plate.carb+=s.carb; plate.fat+=s.fat;
+  });
+  const al = already[person.id] || {cal:0,protein:0,carb:0,fat:0};
+  const target = mealTargets(person, cfg).meals[plateSlot];
+  const combined = {
+    cal: al.cal+plate.cal, protein: al.protein+plate.protein, carb: al.carb+plate.carb, fat: al.fat+plate.fat
+  };
+  const remaining = target.cal - combined.cal;
+  const pct = clamp(combined.cal/Math.max(target.cal,1)*100,0,140);
+  return `
+    <div class="person-card">
+      <h3>${person.name}</h3>
+      <div class="stat"><span>This plate</span><b>${round0(plate.cal)} cal &middot; P${round0(plate.protein)} C${round0(plate.carb)} F${round0(plate.fat)}</b></div>
+      ${al.cal>0?`<div class="stat"><span>Already logged (${plateSlot})</span><b>${round0(al.cal)} cal</b></div>`:''}
+      <div class="stat"><span>Target (${plateSlot})</span><b>${round0(target.cal)} cal &middot; P${round0(target.protein)} C${round0(target.carb)} F${round0(target.fat)}</b></div>
+      <div class="bar-wrap"><div class="bar ${pct>100?'over':''}" style="width:${Math.min(pct,100)}%;"></div></div>
+      <div class="stat"><span>Remaining</span><b style="color:${remaining<0?'var(--bad)':'var(--good)'};">${remaining>=0?'+':''}${round0(remaining)} cal</b></div>
+    </div>
+  `;
+}
+async function commitPlate(){
+  const cfg = STATE.config;
+  const validLines = plateLines.filter(l=>l.foodId && l.grams>0);
+  if(validLines.length===0){ toast('Add at least one ingredient with grams'); return; }
+  const p1 = cfg.people[0], p2 = cfg.people[1];
+  const personTotals = {};
+  cfg.people.forEach(p=>{ personTotals[p.id] = {grams:0}; NUTS.forEach(n=>personTotals[p.id][n]=0); });
+  const foodNames = [];
+  validLines.forEach(l=>{
+    const f = STATE.foods[l.foodId];
+    if(!f) return;
+    if(!foodNames.includes(f.name)) foodNames.push(f.name);
+    if(l.assign==='shared'){
+      const g1 = l.grams*plateSplitPct/100, g2 = l.grams-g1;
+      const s1 = scaleFood(f, g1), s2 = scaleFood(f, g2);
+      NUTS.forEach(n=> personTotals[p1.id][n]+=s1[n]);
+      personTotals[p1.id].grams += g1;
+      NUTS.forEach(n=> personTotals[p2.id][n]+=s2[n]);
+      personTotals[p2.id].grams += g2;
+    } else {
+      const s = scaleFood(f, l.grams);
+      NUTS.forEach(n=> personTotals[l.assign][n]+=s[n]);
+      personTotals[l.assign].grams += l.grams;
+    }
+  });
+  const label = foodNames.join(', ');
+  if(!STATE.logs[plateDate]) STATE.logs[plateDate]=[];
+  const newRows = [];
+  cfg.people.forEach(p=>{
+    const t = personTotals[p.id];
+    if(t.grams<=0) return;
+    const row = {id:uid(), person:p.id, slot:plateSlot, foodName:label, grams:t.grams};
+    NUTS.forEach(n=> row[n]=t[n]);
+    STATE.logs[plateDate].push(row);
+    newRows.push(row);
+  });
+  try{
+    await insertLogRows(newRows, plateDate);
+    toast('Logged for both');
+  }catch(e){
+    console.error(e);
+    toast('Could not save to Supabase — check connection');
+  }
+  plateLines = [{foodId:'', grams:0, assign:'shared'}];
+  renderLog(document.getElementById('tabroot'));
+}
+function personName(pid){
+  const p = STATE.config.people.find(p=>p.id===pid);
+  return p? p.name : pid;
+}
+function renderLogSlot(slot, entries){
+  const rows = entries.filter(e=>e.slot===slot);
+  return `
+    <div class="meal-slot-header"><h3>${slot}</h3></div>
+    <div class="table-scroll"><table>
+      <tr><th>Person</th><th>Item</th><th>Grams</th><th>Cal</th><th>P</th><th>C</th><th>F</th><th></th></tr>
+      ${rows.map(e=>`
+        <tr>
+          <td>${personName(e.person)}</td>
+          <td>${e.foodName}</td>
+          <td class="mono">${round0(e.grams)}</td>
+          <td class="mono">${round0(e.cal)}</td>
+          <td class="mono">${round1(e.protein)}</td>
+          <td class="mono">${round1(e.carb)}</td>
+          <td class="mono">${round1(e.fat)}</td>
+          <td><button class="btn danger" style="padding:2px 7px;" onclick="deleteLogEntry('${slot}','${e.id}')">×</button></td>
+        </tr>
+      `).join('') || `<tr><td colspan="8" class="empty">Nothing logged for ${slot} yet.</td></tr>`}
+    </table></div>
+  `;
+}
+async function deleteLogEntry(slot, id){
+  STATE.logs[plateDate] = (STATE.logs[plateDate]||[]).filter(e=>e.id!==id);
+  try{
+    await deleteLogRow(id);
+  }catch(e){
+    console.error(e);
+    toast('Could not delete — check connection');
+  }
+  renderLog(document.getElementById('tabroot'));
+}
+
+// ============================================================
+// TODAY TAB
+// ============================================================
+function renderToday(root){
+  const cfg = STATE.config;
+  const date = STATE.currentDate;
+  const entries = STATE.logs[date]||[];
+  root.innerHTML = `
+    <div class="panel">
+      <div class="row"><div><label>Date</label><input type="date" id="td-date" value="${date}" onchange="STATE.currentDate=this.value; renderToday(document.getElementById('tabroot'))"></div></div>
+    </div>
+    <div class="grid2">
+      ${cfg.people.map(p=>renderPersonToday(p,cfg,entries)).join('')}
+    </div>
+  `;
+}
+function renderPersonToday(p, cfg, entries){
+  const mt = mealTargets(p, cfg);
+  const mine = entries.filter(e=>e.person===p.id);
+  let runningRemainingCal = 0; // carries across meals
+  const slotsHtml = ['breakfast','lunch','dinner'].map(slot=>{
+    const rows = mine.filter(e=>e.slot===slot);
+    const consumed = {cal:0,protein:0,carb:0,fat:0};
+    rows.forEach(e=>{ consumed.cal+=e.cal; consumed.protein+=e.protein; consumed.carb+=e.carb; consumed.fat+=e.fat; });
+    const target = mt.meals[slot];
+    const allowance = target.cal + runningRemainingCal;
+    const remaining = allowance - consumed.cal;
+    runningRemainingCal = remaining;
+    const pct = clamp(consumed.cal/Math.max(allowance,1)*100,0,140);
+    return `
+      <div style="margin-bottom:10px;">
+        <div class="stat"><span style="text-transform:capitalize;">${slot}</span><b>${round0(consumed.cal)} / ${round0(allowance)} cal</b></div>
+        <div class="bar-wrap"><div class="bar ${pct>100?'over':''}" style="width:${Math.min(pct,100)}%;"></div></div>
+        <div class="stat"><span>P ${round1(consumed.protein)}/${round1(target.protein)} &middot; C ${round1(consumed.carb)}/${round1(target.carb)} &middot; F ${round1(consumed.fat)}/${round1(target.fat)}</span><span>${remaining>=0?'+':''}${round0(remaining)} left</span></div>
+      </div>
+    `;
+  }).join('');
+  const dayConsumed = {cal:0,protein:0,carb:0,fat:0,fibre:0};
+  mine.forEach(e=>{ dayConsumed.cal+=e.cal; dayConsumed.protein+=e.protein; dayConsumed.carb+=e.carb; dayConsumed.fat+=e.fat; dayConsumed.fibre+=e.fibre||0; });
+  const dayPct = clamp(dayConsumed.cal/Math.max(mt.day.cal,1)*100,0,140);
+  const proteinPct = clamp(dayConsumed.protein/Math.max(mt.day.protein,1)*100,0,140);
+  const carbPct = clamp(dayConsumed.carb/Math.max(mt.day.carb,1)*100,0,140);
+  const fatPct = clamp(dayConsumed.fat/Math.max(mt.day.fat,1)*100,0,140);
+  return `
+    <div class="person-card">
+      <h3>${p.name}</h3>
+      ${slotsHtml}
+      <div class="section-title" style="margin-top:14px;">Full day</div>
+      <div class="stat"><span>Cal</span><b>${round0(dayConsumed.cal)} / ${round0(mt.day.cal)}</b></div>
+      <div class="bar-wrap"><div class="bar ${dayPct>100?'over':''}" style="width:${Math.min(dayPct,100)}%;"></div></div>
+      <div class="stat"><span>Protein</span><b>${round1(dayConsumed.protein)} / ${round1(mt.day.protein)}</b></div>
+      <div class="bar-wrap"><div class="bar ${proteinPct>100?'over':''}" style="width:${Math.min(proteinPct,100)}%;"></div></div>
+      <div class="stat"><span>Carb</span><b>${round1(dayConsumed.carb)} / ${round1(mt.day.carb)}</b></div>
+      <div class="bar-wrap"><div class="bar ${carbPct>100?'over':''}" style="width:${Math.min(carbPct,100)}%;"></div></div>
+      <div class="stat"><span>Fat</span><b>${round1(dayConsumed.fat)} / ${round1(mt.day.fat)}</b></div>
+      <div class="bar-wrap"><div class="bar ${fatPct>100?'over':''}" style="width:${Math.min(fatPct,100)}%;"></div></div>
+      <div class="stat"><span>Fibre</span><b>${round1(dayConsumed.fibre)} / ${p.fibreTarget?round0(p.fibreTarget):'—'}</b></div>
+    </div>
+  `;
+}
+
+// ============================================================
+// WEEK TAB
+// ============================================================
+function renderWeek(root){
+  const cfg = STATE.config;
+  const dates = Object.keys(STATE.logs).sort().reverse().slice(0,7);
+  root.innerHTML = `
+    <div class="panel">
+      <div class="section-title">Last ${dates.length} logged day${dates.length===1?'':'s'} — averages</div>
+      <div class="grid2">
+        ${cfg.people.map(p=>renderPersonWeek(p,cfg,dates)).join('')}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="section-title">Day-by-day</div>
+      <div class="table-scroll"><table>
+        <tr><th>Date</th>${cfg.people.map(p=>`<th>${p.name} Cal</th>`).join('')}</tr>
+        ${dates.map(d=>{
+          const entries = STATE.logs[d]||[];
+          return `<tr><td class="mono">${d}</td>${cfg.people.map(p=>{
+            const c = entries.filter(e=>e.person===p.id).reduce((s,e)=>s+e.cal,0);
+            return `<td class="mono">${round0(c)}</td>`;
+          }).join('')}</tr>`;
+        }).join('') || '<tr><td class="empty">No logged days yet.</td></tr>'}
+      </table></div>
+    </div>
+  `;
+}
+function renderPersonWeek(p, cfg, dates){
+  const mt = mealTargets(p,cfg);
+  if(dates.length===0){
+    return `<div class="person-card"><h3>${p.name}</h3><div class="empty">No data yet.</div></div>`;
+  }
+  const sums = {cal:0,protein:0,carb:0,fat:0,fibre:0,sugar:0,salt:0};
+  dates.forEach(d=>{
+    (STATE.logs[d]||[]).filter(e=>e.person===p.id).forEach(e=>{
+      NUTS.forEach(n=> sums[n]+=e[n]||0);
+    });
+  });
+  const n = dates.length;
+  return `
+    <div class="person-card">
+      <h3>${p.name}</h3>
+      <div class="table-scroll"><table>
+        <tr><th></th>${NUTS.map(n=>`<th>${NUT_LABELS[n]}</th>`).join('')}</tr>
+        <tr><td class="mono">Avg/day</td>${NUTS.map(k=>`<td class="mono">${round1(sums[k]/n)}</td>`).join('')}</tr>
+        <tr><td class="mono">Target</td><td class="mono">${round0(mt.day.cal)}</td><td class="mono">${round1(mt.day.protein)}</td><td class="mono">${round1(mt.day.carb)}</td><td class="mono">${round1(mt.day.fat)}</td><td>—</td><td>—</td><td>—</td></tr>
+      </table></div>
+    </div>
+  `;
+}
+
+// ============================================================
+// DATA TAB — backup, restore, CSV export
+// ============================================================
+function renderData(root){
+  const names = STATE.config.people.map(p=>p.name).join(' & ');
+  const dayCount = Object.keys(STATE.logs).length;
+  root.innerHTML = `
+    <div class="panel">
+      <div class="section-title">Backup everything</div>
+      <p class="small">Save a complete copy of config, master list, and all logged days as a JSON file.</p>
+      <button class="btn" onclick="downloadBackup()">Download backup</button>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">Restore a backup</div>
+      <p class="small">Replace this shared data with a previous Shredder backup file. This overwrites current config, master list, and logs — for both ${names}.</p>
+      <div class="row">
+        <div><input type="file" id="restore-file" accept="application/json"></div>
+      </div>
+      <button class="btn secondary" onclick="restoreBackup()">Choose backup &amp; restore</button>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">Export spreadsheet</div>
+      <p class="small">Download every logged entry (${dayCount} day${dayCount===1?'':'s'}) as a CSV for analysis.</p>
+      <button class="btn" onclick="exportCSV()">Export CSV</button>
+    </div>
+
+    <div class="panel" style="background:var(--track);border:none;">
+      <div class="section-title" style="border:none;margin:0 0 6px;">Stored data</div>
+      <p class="small">Config, master list and logs live in a shared Supabase database, independent of this app's code — they persist when you update the app with new features. Backups above give you an external copy for safekeeping or analysis elsewhere.</p>
+    </div>
+  `;
+}
+async function downloadBackup(){
+  const backup = {
+    app:'shredder', exportedAt: new Date().toISOString(),
+    config: STATE.config, foods: STATE.foods, logs: STATE.logs
+  };
+  const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `shredder-backup-${todayStr()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded');
+}
+async function restoreBackup(){
+  const input = document.getElementById('restore-file');
+  if(!input.files || !input.files[0]){ toast('Choose a file first'); return; }
+  try{
+    const text = await input.files[0].text();
+    const data = JSON.parse(text);
+    if(!data.config || !data.foods){ toast("That file doesn't look like a Shredder backup"); return; }
+    STATE.config = data.config;
+    STATE.foods = data.foods;
+    STATE.logs = data.logs || {};
+    await saveConfigToDb(STATE.config);
+    const foodList = Object.values(STATE.foods);
+    if(foodList.length) await upsertFoods(foodList);
+    for(const date of Object.keys(STATE.logs)){
+      await insertLogRows(STATE.logs[date], date, true);
+    }
+    toast('Backup restored');
+    render();
+  }catch(e){
+    console.error(e);
+    toast('Could not read that file');
+  }
+}
+function csvEscape(v){
+  const s = String(v??'');
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function exportCSV(){
+  const rows = [['Date','Slot','Person','Food','Grams','Cal','Protein','Carb','Fat','Fibre','Sugar','Salt']];
+  Object.keys(STATE.logs).sort().forEach(date=>{
+    STATE.logs[date].forEach(e=>{
+      rows.push([date, e.slot, personName(e.person), e.foodName, e.grams, e.cal, e.protein, e.carb, e.fat, e.fibre, e.sugar, e.salt]);
+    });
+  });
+  const csv = rows.map(r=>r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `shredder-log-${todayStr()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast('CSV exported');
+}
+
+// ---------- boot ----------
+loadAll();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(e=>console.error('SW register failed', e));
+  });
+}
+</script>
+</body>
+</html>
